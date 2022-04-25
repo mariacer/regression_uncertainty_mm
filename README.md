@@ -12,7 +12,7 @@ How to build the documentation is explained in the `docs` folder.
 
 ## Running experiments
 
-For running experiments, move to the `mm_uncertainty` subfolder. Further instructions can be found on the [README](mm_uncertainty/README.rst) there.
+For running experiments, move to the `regression_uncertainty_mm` subfolder. Further instructions can be found on the [README](mm_uncertainty/README.rst) there.
 
 ## Citation
 
