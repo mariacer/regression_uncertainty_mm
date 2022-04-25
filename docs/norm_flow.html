@@ -1,0 +1,827 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Normalizing Flows &#8212; regression_uncertainty_mm 0.1 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Networks" href="networks.html" />
+    <link rel="prev" title="Regression experiments with Gaussian Likelihoods" href="gaussian_likelihoods.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="normalizing-flows">
+<span id="norm-flow-reference-label"></span><h1><a class="toc-backref" href="#id5">Normalizing Flows</a><a class="headerlink" href="#normalizing-flows" title="Permalink to this headline">¶</a></h1>
+<div class="contents topic" id="contents">
+<p class="topic-title first">Contents</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#normalizing-flows" id="id5">Normalizing Flows</a></p>
+<ul>
+<li><p><a class="reference internal" href="#general-notes" id="id6">General Notes</a></p>
+<ul>
+<li><p><a class="reference internal" href="#unimodal-1d-toy-experiments" id="id7">Unimodal 1D Toy Experiments</a></p>
+<ul>
+<li><p><a class="reference internal" href="#deterministic-hypernetwork-and-normalizing-flow" id="id8">Deterministic hypernetwork and normalizing flow</a></p></li>
+<li><p><a class="reference internal" href="#bayesian-hypernetwork-and-normalizing-flow" id="id9">Bayesian hypernetwork and normalizing flow</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#bimodal-1d-toy-experiments" id="id10">Bimodal 1D Toy Experiments</a></p>
+<ul>
+<li><p><a class="reference internal" href="#id1" id="id11">Deterministic hypernetwork and normalizing flow</a></p></li>
+<li><p><a class="reference internal" href="#id2" id="id12">Bayesian hypernetwork and normalizing flow</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#bimodal-2d-toy-experiments" id="id13">Bimodal 2D Toy Experiments</a></p>
+<ul>
+<li><p><a class="reference internal" href="#id3" id="id14">Deterministic hypernetwork and normalizing flow</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#steering-angle-prediction-experiments" id="id15">Steering Angle Prediction Experiments</a></p></li>
+<li><p><a class="reference internal" href="#id4" id="id16">Steering Angle Prediction Experiments</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#module-normalizing_flows.train_utils" id="id17">API</a></p>
+<ul>
+<li><p><a class="reference internal" href="#simple-normalizing-flow-for-1d-regression-experiments" id="id18">Simple normalizing flow for 1D regression experiments</a></p></li>
+<li><p><a class="reference internal" href="#spline-layer-to-be-used-for-normalizing-flows" id="id19">Spline layer to be used for normalizing flows</a></p></li>
+<li><p><a class="reference internal" href="#perceptron-for-a-normalizing-flow" id="id20">Perceptron for a normalizing flow</a></p></li>
+<li><p><a class="reference internal" href="#bivariate-normalizing-flow-for-2d-regression-experiments" id="id21">Bivariate normalizing flow for 2D regression experiments</a></p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+<p>This module contains all relevant functions to run experiments with flow-based likelihood models.</p>
+<div class="section" id="general-notes">
+<h2><a class="toc-backref" href="#id6">General Notes</a><a class="headerlink" href="#general-notes" title="Permalink to this headline">¶</a></h2>
+<p>Performing regression experiments with a flexible likelihood parametrized by a normalizing flow. The architecture of the system is the following:</p>
+<a class="reference internal image-reference" href="_images/nf.png"><img alt="The architecture of our regression system based on normalizing flows." src="_images/nf.png" style="width: 400px;" /></a>
+<p>Note that the models generated are Bayesian by default (i.e. the hypernetwork is Bayesian). However, a deterministic model can be used by setting the option <code class="docutils literal notranslate"><span class="pre">--mean_only</span></code>.</p>
+<p>Furthermore, regression can be done using one of two toy regression datasets based on a cubic polynomial. In the basic setting, a polynomial with a single mode is generated. However if desired a bimodal distribution can be used by setting the option <code class="docutils literal notranslate"><span class="pre">--noise=bimodal</span></code>.</p>
+<div class="section" id="unimodal-1d-toy-experiments">
+<h3><a class="toc-backref" href="#id7">Unimodal 1D Toy Experiments</a><a class="headerlink" href="#unimodal-1d-toy-experiments" title="Permalink to this headline">¶</a></h3>
+<p>Please run the following command to see the available options for running 1D toy experiments.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train.py --help
+</pre></div>
+</div>
+<div class="section" id="deterministic-hypernetwork-and-normalizing-flow">
+<h4><a class="toc-backref" href="#id8">Deterministic hypernetwork and normalizing flow</a><a class="headerlink" href="#deterministic-hypernetwork-and-normalizing-flow" title="Permalink to this headline">¶</a></h4>
+<p>The following run achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train.py --kl_scale<span class="o">=</span><span class="m">0</span> --train_sample_size<span class="o">=</span><span class="m">1</span> --val_sample_size<span class="o">=</span><span class="m">1</span> --n_iter<span class="o">=</span><span class="m">7001</span> --lr<span class="o">=</span><span class="m">0</span>.01 --clip_grad_norm<span class="o">=</span>-1 --hmlp_arch<span class="o">=</span><span class="m">10</span>,10,10 --hnet_dropout_rate<span class="o">=</span>-1 --flow_depth<span class="o">=</span><span class="m">5</span> --flow_layer_type<span class="o">=</span>splines --val_iter<span class="o">=</span><span class="m">1000</span> --num_train<span class="o">=</span><span class="m">20</span> --mean_only --noise<span class="o">=</span>gaussian
+</pre></div>
+</div>
+</div>
+<div class="section" id="bayesian-hypernetwork-and-normalizing-flow">
+<h4><a class="toc-backref" href="#id9">Bayesian hypernetwork and normalizing flow</a><a class="headerlink" href="#bayesian-hypernetwork-and-normalizing-flow" title="Permalink to this headline">¶</a></h4>
+<p>The following run achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train.py --disable_lrt_test --n_iter<span class="o">=</span><span class="m">20001</span> --lr<span class="o">=</span><span class="m">0</span>.01 --clip_grad_norm<span class="o">=</span>-1 --train_sample_size<span class="o">=</span><span class="m">1</span> --local_reparam_trick --hmlp_arch<span class="o">=</span><span class="m">20</span>,20 --hnet_dropout_rate<span class="o">=</span><span class="m">0</span>.2 --flow_depth<span class="o">=</span><span class="m">1</span> --flow_layer_type<span class="o">=</span>splines --val_iter<span class="o">=</span><span class="m">1000</span> --val_sample_size<span class="o">=</span><span class="m">100</span> --num_train<span class="o">=</span><span class="m">20</span> --noise<span class="o">=</span>gaussian
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="bimodal-1d-toy-experiments">
+<h3><a class="toc-backref" href="#id10">Bimodal 1D Toy Experiments</a><a class="headerlink" href="#bimodal-1d-toy-experiments" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id1">
+<h4><a class="toc-backref" href="#id11">Deterministic hypernetwork and normalizing flow</a><a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h4>
+<p>The following run with <strong>20 training points</strong> achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train.py --kl_scale<span class="o">=</span><span class="m">0</span> --train_sample_size<span class="o">=</span><span class="m">1</span> --val_sample_size<span class="o">=</span><span class="m">1</span> --n_iter<span class="o">=</span><span class="m">30001</span> --lr<span class="o">=</span><span class="m">0</span>.01 --clip_grad_norm<span class="o">=</span><span class="m">1</span> --hmlp_arch<span class="o">=</span><span class="m">10</span>,10 --hnet_dropout_rate<span class="o">=</span>-1 --flow_depth<span class="o">=</span><span class="m">1</span> --flow_layer_type<span class="o">=</span>splines --val_iter<span class="o">=</span><span class="m">1000</span> --num_train<span class="o">=</span><span class="m">20</span> --mean_only --noise<span class="o">=</span>bimodal
+</pre></div>
+</div>
+<p>The following run with <strong>50 training points</strong> achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train.py --kl_scale<span class="o">=</span><span class="m">0</span> --train_sample_size<span class="o">=</span><span class="m">1</span> --val_sample_size<span class="o">=</span><span class="m">1</span> --batch_size<span class="o">=</span><span class="m">32</span> --n_iter<span class="o">=</span><span class="m">10001</span> --lr<span class="o">=</span><span class="m">0</span>.01 --clip_grad_norm<span class="o">=</span><span class="m">1</span> --hmlp_arch<span class="o">=</span><span class="m">100</span>,100 --hnet_dropout_rate<span class="o">=</span>-1 --hnet_net_act<span class="o">=</span>sigmoid --flow_depth<span class="o">=</span><span class="m">3</span> --flow_layer_type<span class="o">=</span>splines --val_iter<span class="o">=</span><span class="m">1000</span> --num_train<span class="o">=</span><span class="m">50</span> --mean_only --noise<span class="o">=</span>bimodal --publication_style
+</pre></div>
+</div>
+<p>The following run with <strong>1000 training points</strong> achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train.py --kl_scale<span class="o">=</span><span class="m">0</span> --train_sample_size<span class="o">=</span><span class="m">1</span> --val_sample_size<span class="o">=</span><span class="m">1</span> --n_iter<span class="o">=</span><span class="m">50001</span> --lr<span class="o">=</span><span class="m">0</span>.001 --clip_grad_norm<span class="o">=</span><span class="m">100</span> --hmlp_arch<span class="o">=</span><span class="m">10</span>,10 --hnet_dropout_rate<span class="o">=</span>-1 --flow_depth<span class="o">=</span><span class="m">3</span> --flow_layer_type<span class="o">=</span>splines --val_iter<span class="o">=</span><span class="m">1000</span> --num_train<span class="o">=</span><span class="m">1000</span> --mean_only --noise<span class="o">=</span>bimodal
+</pre></div>
+</div>
+</div>
+<div class="section" id="id2">
+<h4><a class="toc-backref" href="#id12">Bayesian hypernetwork and normalizing flow</a><a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h4>
+<p>The following run with <strong>20 training points</strong> achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train.py --disable_lrt_test --n_iter<span class="o">=</span><span class="m">20001</span> --lr<span class="o">=</span><span class="m">0</span>.0001 --clip_grad_norm<span class="o">=</span>-1 --train_sample_size<span class="o">=</span><span class="m">10</span> --local_reparam_trick --hmlp_arch<span class="o">=</span><span class="m">10</span>,10 --hnet_dropout_rate<span class="o">=</span>-1 --flow_depth<span class="o">=</span><span class="m">1</span> --flow_layer_type<span class="o">=</span>splines --val_iter<span class="o">=</span><span class="m">1000</span> --val_sample_size<span class="o">=</span><span class="m">190</span> --no_plots --num_train<span class="o">=</span><span class="m">20</span> --noise<span class="o">=</span>bimodal
+</pre></div>
+</div>
+<p>The following run with <strong>50 training points</strong> achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train.py --disable_lrt_test --batch_size<span class="o">=</span><span class="m">32</span> --n_iter<span class="o">=</span><span class="m">10001</span> --lr<span class="o">=</span><span class="m">0</span>.001 --clip_grad_norm<span class="o">=</span><span class="m">100</span> --train_sample_size<span class="o">=</span><span class="m">1</span> --prior_variance<span class="o">=</span><span class="m">1</span>.0 --local_reparam_trick --kl_scale<span class="o">=</span><span class="m">0</span>.01 --hmlp_arch<span class="o">=</span><span class="m">100</span>,100 --hnet_dropout_rate<span class="o">=</span>-1 --hnet_net_act<span class="o">=</span>sigmoid --flow_depth<span class="o">=</span><span class="m">2</span> --flow_layer_type<span class="o">=</span>splines --val_iter<span class="o">=</span><span class="m">1000</span> --val_sample_size<span class="o">=</span><span class="m">190</span> --num_train<span class="o">=</span><span class="m">50</span> --noise<span class="o">=</span>bimodal
+</pre></div>
+</div>
+<p>The following run with <strong>1000 training points</strong> achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train.py --n_iter<span class="o">=</span><span class="m">50001</span> --lr<span class="o">=</span><span class="m">0</span>.001 --clip_grad_norm<span class="o">=</span><span class="m">1</span> --train_sample_size<span class="o">=</span><span class="m">1</span> --hmlp_arch<span class="o">=</span><span class="m">5</span>,5 --hnet_dropout_rate<span class="o">=</span>-1 --flow_depth<span class="o">=</span><span class="m">3</span> --flow_layer_type<span class="o">=</span>splines --val_iter<span class="o">=</span><span class="m">1000</span> --val_sample_size<span class="o">=</span><span class="m">190</span> --no_plots --num_train<span class="o">=</span><span class="m">1000</span> --noise<span class="o">=</span>bimodal
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="bimodal-2d-toy-experiments">
+<h3><a class="toc-backref" href="#id13">Bimodal 2D Toy Experiments</a><a class="headerlink" href="#bimodal-2d-toy-experiments" title="Permalink to this headline">¶</a></h3>
+<p>Please run the following command to see the available options for running 2D toy experiments.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_2d.py --help
+</pre></div>
+</div>
+<div class="section" id="id3">
+<h4><a class="toc-backref" href="#id14">Deterministic hypernetwork and normalizing flow</a><a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h4>
+<p>The following run with <strong>3000 training points</strong> achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_2d.py --kl_scale<span class="o">=</span><span class="m">0</span> --train_sample_size<span class="o">=</span><span class="m">1</span> --val_sample_size<span class="o">=</span><span class="m">1</span> --n_iter<span class="o">=</span><span class="m">10001</span> --lr<span class="o">=</span><span class="m">0</span>.01 --clip_grad_norm<span class="o">=</span><span class="m">100</span> --hmlp_arch<span class="o">=</span><span class="m">20</span>,20,20 --hnet_dropout_rate<span class="o">=</span>-1 --conditioner_arch<span class="o">=</span><span class="m">5</span>,5 --flow_depth<span class="o">=</span><span class="m">10</span> --flow_layer_type<span class="o">=</span>splines --val_iter<span class="o">=</span><span class="m">1000</span> --num_train<span class="o">=</span><span class="m">3000</span> --mean_only --noise<span class="o">=</span>bimodal --offset<span class="o">=</span><span class="m">15</span> --cov<span class="o">=</span><span class="m">300</span>,20
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="steering-angle-prediction-experiments">
+<h3><a class="toc-backref" href="#id15">Steering Angle Prediction Experiments</a><a class="headerlink" href="#steering-angle-prediction-experiments" title="Permalink to this headline">¶</a></h3>
+<p>Please run the following command to see the available options for running 1D toy experiments.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_udacity.py --help
+</pre></div>
+</div>
+</div>
+<div class="section" id="id4">
+<h3><a class="toc-backref" href="#id16">Steering Angle Prediction Experiments</a><a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h3>
+<p>The following run with a <strong>Resnet-18</strong> achieves lowest negative log-likelihood on the validation set for this model:</p>
+<blockquote>
+<div><p>$ python3 train_udacity.py –mean_only –batch_size=16 –n_iter=1000 –epochs=30 –lr=0.0001 –adam_beta1=0.5 –clip_grad_value=-1 –clip_grad_norm=-1.0 –kl_scale=0 –flow_depth=15 –flow_layer_type=”splines” –train_sample_size=1 –val_sample_size=1 –net_type=”iresnet” –iresnet_use_fc_bias –net_act=”relu” –no_bias –dropout_rate=-1 –hmlp_arch=”” –hnet_net_act=”relu” –hnet_dropout_rate=-1 –hmlp_uncond_in_size=10</p>
+</div></blockquote>
+</div>
+</div>
+<div class="section" id="module-normalizing_flows.train_utils">
+<span id="api"></span><h2><a class="toc-backref" href="#id17">API</a><a class="headerlink" href="#module-normalizing_flows.train_utils" title="Permalink to this headline">¶</a></h2>
+<p>Helper functions for training scripts.</p>
+<dl class="function">
+<dt id="normalizing_flows.train_utils.compute_entropy_nf">
+<code class="sig-prename descclassname">normalizing_flows.train_utils.</code><code class="sig-name descname">compute_entropy_nf</code><span class="sig-paren">(</span><em class="sig-param">mnet</em>, <em class="sig-param">hnet</em>, <em class="sig-param">config</em>, <em class="sig-param">x_torch</em>, <em class="sig-param">num_inputs</em>, <em class="sig-param">num_samples=1000</em>, <em class="sig-param">num_models=100</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/train_utils.html#compute_entropy_nf"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.train_utils.compute_entropy_nf" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the entropy of a posterior predictive distribution based on NFs.</p>
+<p>For details about the value being compute please refer to
+<a class="reference internal" href="gaussian_likelihoods.html#gaussian_likelihoods.train_utils.compute_entropy_gaussian" title="gaussian_likelihoods.train_utils.compute_entropy_gaussian"><code class="xref py py-func docutils literal notranslate"><span class="pre">gaussian_likelihoods.train_utils.compute_entropy_gaussian()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mnet</strong> – The main network.</p></li>
+<li><p><strong>hnet</strong> – The hypernetwork.</p></li>
+<li><p><strong>config</strong> – The configuration.</p></li>
+<li><p><strong>x_torch</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch v1.12)"><em>torch.Tensor</em></a>) – The inputs.</p></li>
+<li><p><strong>num_inputs</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.10)"><em>int</em></a>) – Size of the input range.</p></li>
+<li><p><strong>num_samples</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.10)"><em>int</em></a>) – The number of samples to use for each input.</p></li>
+<li><p><strong>num_models</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.10)"><em>int</em></a>) – The number of models to sample for Bayesian networks.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>The averaged entropy across weight samples for the entire</dt><dd><p>input range.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(np.array)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="normalizing_flows.train_utils.compute_nf_loss">
+<code class="sig-prename descclassname">normalizing_flows.train_utils.</code><code class="sig-name descname">compute_nf_loss</code><span class="sig-paren">(</span><em class="sig-param">flow</em>, <em class="sig-param">Y</em>, <em class="sig-param">logabsdet</em>, <em class="sig-param">reduction='mean'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/train_utils.html#compute_nf_loss"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.train_utils.compute_nf_loss" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the loss of the normalizing flow.</p>
+<p>This function deals with a single model, and the sum for the MC estimate is
+therefore done outside this function.</p>
+<p>Overall, we want to minimize the expectation over our training samples of
+the KL divergence between our groundtruth <img class="math" src="_images/math/d779bfc81449a9396441948d00c0f4ff79248405.png" alt="p(y \mid x)"/> and our
+predictions <img class="math" src="_images/math/3e52362c2c35d1261dc1abb898fcdb91281d2b33.png" alt="q(y \mid x, w)"/>, so we want to minimize:</p>
+<div class="math">
+<p><img src="_images/math/4b5fe4092b5f4766520fe54ef7bd481b00d8cb87.png" alt="\mathbb{E}_{p(x)}[D_{KL}(p(y|x) \parallel q(y|x,w))] &amp;= \
+    \mathbb{E}_{p(x)}\big[\mathbb{E}_{p(y|x)}[\log \
+    \frac{p(y|x)}{q(y|x,w)}] \big] \\"/></p>
+</div><p>Dropping the terms that don’t depent on the posterior we obtain that we
+want to minimize the negative cross-entropy
+<img class="math" src="_images/math/51bd26521cc87dc357e33e6d9dd45bc32280cfa6.png" alt="-\mathbb{E}_{p(x, y)}[\log q(y|x,w)] \big]"/>.</p>
+<p>In a normalizing flow, we have the following expression for
+<img class="math" src="_images/math/d211db92a8ea6ed353df41c1a4e2e4d07f0896e3.png" alt="q(y|x,w)"/>:</p>
+<div class="math">
+<p><img src="_images/math/222290ad762773600b28347c674f64779663b96e.png" alt="q(y|x,w) = p_u(u) \mid \det \mathcal{J}_{T(x)}(u) \mid ^{-1}"/></p>
+</div><p>Furthermore we have that <img class="math" src="_images/math/151d6558337acf291e2d46d84aef246f43e20d21.png" alt="y = T_x(u)"/> so <img class="math" src="_images/math/fff1568d2b92f3f82226b7c3cf70ed86d2a28884.png" alt="u = T_x^{-1}(y)"/>.
+Therefore <img class="math" src="_images/math/028ad8eecf736ba2c2a4e42fb6423192a0ba1cc2.png" alt="p_u(u) = p_u(T_x^{-1}(y))"/>, and be obtain:</p>
+<div class="math">
+<p><img src="_images/math/f528c2f2dc3c3771ee5f99a975abd414ef6cf70b.png" alt="- \mathbb{E}_{p(x, y)}[\log q(y|x,w)] \big] =
+    - \mathbb{E}_{p(x, y)}[\log p_u(T_x^{-1}(y)) + \
+    \log \mid \det \mathcal{J}_{T_x}(T_x^{-1}(y)) \mid ^{-1}]"/></p>
+</div><p>Noticing that
+<img class="math" src="_images/math/26eaadfc99abf8b5ee0f110ebbbe43a65696f955.png" alt="\mid \det \mathcal{J}_{T_x}(T_x^{-1}(y)) \mid ^{-1} = \mid \det \
+\mathcal{J}_{T_x^{-1}}(y) \mid"/> we obtain the following MC estimate and
+loss function:</p>
+<div class="math">
+<p><img src="_images/math/b631f9f0f0c0b6e515ee6fb35fc9ef66512baadf.png" alt="L(y, x) = - \frac{1}{n}\sum_{i=1}^n [ \log p_u(T_{x_i}^{-1}(y_i)) + \
+    \log \mid \det \mathcal{J}_{T_{x_i}^{-1}}(y_i) \mid ]"/></p>
+</div><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>flow</strong> (<a class="reference internal" href="#normalizing_flows.simple_regression.simple_flow.SimpleFlow" title="normalizing_flows.simple_regression.simple_flow.SimpleFlow"><em>SimpleFlow</em></a>) – The normalizing flow.</p></li>
+<li><p><strong>Y</strong> – Output tensor consisting of means. Same shape as <code class="docutils literal notranslate"><span class="pre">T</span></code>.</p></li>
+<li><p><strong>logabsdet</strong> – The log of the absolute of the Jacobian.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The loss.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.10)">float</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="normalizing_flows.train_utils.max_deviation">
+<code class="sig-prename descclassname">normalizing_flows.train_utils.</code><code class="sig-name descname">max_deviation</code><span class="sig-paren">(</span><em class="sig-param">data</em>, <em class="sig-param">flow</em>, <em class="sig-param">hnet</em>, <em class="sig-param">device</em>, <em class="sig-param">x=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/train_utils.html#max_deviation"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.train_utils.max_deviation" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes the maximum deviation between forward and inverse passes of a
+normalizing flow.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>(</strong><strong>...</strong><strong>)</strong> – See docstring of function <a class="reference internal" href="#normalizing_flows.train_utils.normality_test" title="normalizing_flows.train_utils.normality_test"><code class="xref py py-func docutils literal notranslate"><span class="pre">normality_test()</span></code></a>.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The maximum deviation.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.10)">float</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="normalizing_flows.train_utils.normality_test">
+<code class="sig-prename descclassname">normalizing_flows.train_utils.</code><code class="sig-name descname">normality_test</code><span class="sig-paren">(</span><em class="sig-param">data</em>, <em class="sig-param">flow</em>, <em class="sig-param">hnet</em>, <em class="sig-param">config</em>, <em class="sig-param">device</em>, <em class="sig-param">x=None</em>, <em class="sig-param">sample_size=100</em>, <em class="sig-param">return_samples=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/train_utils.html#normality_test"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.train_utils.normality_test" title="Permalink to this definition">¶</a></dt>
+<dd><p>Performs the Shapiro–Wilk test on the null hypothesis that the likelihood
+is normally distributed at a training point.</p>
+<p>See SciPy
+<a class="reference external" href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.shapiro.html">_documentation</a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> – Data handler.</p></li>
+<li><p><strong>flow</strong> – Normalizing flow.</p></li>
+<li><p><strong>hnet</strong> – Hypernetwork.</p></li>
+<li><p><strong>device</strong> – CUDA device.</p></li>
+<li><p><strong>config</strong> – The experiment config.</p></li>
+<li><p><strong>x</strong> (<em>optional</em>) – A point at which to test the normality of the likelihood.</p></li>
+<li><p><strong>sample_size</strong> – Sample size to use for the normality test.</p></li>
+<li><p><strong>return_samples</strong> – If True, the samples used to compute the p-value are
+also returned.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>p-value of the test.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.10)">float</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<span class="target" id="module-normalizing_flows.simple_regression.simple_flow"></span><div class="section" id="simple-normalizing-flow-for-1d-regression-experiments">
+<h3><a class="toc-backref" href="#id18">Simple normalizing flow for 1D regression experiments</a><a class="headerlink" href="#simple-normalizing-flow-for-1d-regression-experiments" title="Permalink to this headline">¶</a></h3>
+<p>Original code by Francesco d’Angelo and Rafael Daetwyler.</p>
+<dl class="class">
+<dt id="normalizing_flows.simple_regression.simple_flow.SimpleFlow">
+<em class="property">class </em><code class="sig-prename descclassname">normalizing_flows.simple_regression.simple_flow.</code><code class="sig-name descname">SimpleFlow</code><span class="sig-paren">(</span><em class="sig-param">depth</em>, <em class="sig-param">dimensionality=1</em>, <em class="sig-param">layers='perceptron'</em>, <em class="sig-param">activation_fn=&lt;class 'normalizing_flows.simple_regression.diffeomorphisms.leaky_relu.LeakyReLU'&gt;</em>, <em class="sig-param">use_bias=True</em>, <em class="sig-param">in_fn=None</em>, <em class="sig-param">out_fn=&lt;class 'normalizing_flows.simple_regression.diffeomorphisms.log_transform.LogTransform'&gt;</em>, <em class="sig-param">spline_bound=1.0</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/simple_regression/simple_flow.html#SimpleFlow"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.simple_regression.simple_flow.SimpleFlow" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">hypnettorch.mnets.mlp.MLP</span></code></p>
+<p>Implementation of an MLP-based normalizing flow.</p>
+<p>This is a normalizing flow based on a simple fully-connected network, that
+receives input vector <img class="math" src="_images/math/57554de99b7c8a834d3b299ba0db23943a89b1f5.png" alt="\mathbf{t}"/> and outputs a vector
+<img class="math" src="_images/math/352f74d71ad9144677bed76f6a9deb39593f2916.png" alt="\mathbf{u}"/> of real values.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>depth</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.10)"><em>int</em></a>) – The depth (number of layers) of the flow.</p></li>
+<li><p><strong>dimensionality</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.10)"><em>int</em></a>) – The dimensionality of the inputs and outputs.</p></li>
+<li><p><strong>layers</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.10)"><em>str</em></a>) – The type of layer to be used.</p></li>
+<li><p><strong>activation_fn</strong> – The nonlinearity used in hidden layers. If <code class="docutils literal notranslate"><span class="pre">None</span></code>, no
+nonlinearity will be applied.</p></li>
+<li><p><strong>use_bias</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.10)"><em>bool</em></a>) – Whether layers may have bias terms.</p></li>
+<li><p><strong>in_fn</strong> (<em>optional</em>) – If provided, this function will be applied to the
+input neurons of the network.</p></li>
+<li><p><strong>out_fn</strong> (<em>optional</em>) – <p>If provided, this function will be applied to the
+output neurons of the network.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This changes the interpretation of the output of the
+<a class="reference internal" href="#normalizing_flows.simple_regression.simple_flow.SimpleFlow.forward" title="normalizing_flows.simple_regression.simple_flow.SimpleFlow.forward"><code class="xref py py-meth docutils literal notranslate"><span class="pre">forward()</span></code></a> method.</p>
+</div>
+</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="method">
+<dt id="normalizing_flows.simple_regression.simple_flow.SimpleFlow.forward">
+<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">t</em>, <em class="sig-param">weights</em>, <em class="sig-param">preprocessed=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/simple_regression/simple_flow.html#SimpleFlow.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.simple_regression.simple_flow.SimpleFlow.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Forward pass through the flow.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>t</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch v1.12)"><em>torch.Tensor</em></a>) – The inputs to the flow.</p></li>
+<li><p><strong>weights</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch v1.12)"><em>torch.Tensor</em></a>) – The weights of the flow.</p></li>
+<li><p><strong>preprocessed</strong> – Whether the weights have been preprocessed.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><p>Tuple containing:</p>
+<ul class="simple">
+<li><p><strong>u</strong>: The output of the flow.</p></li>
+<li><dl class="simple">
+<dt><strong>logabsdet</strong>: The absolute value of the log of the Jacobian of</dt><dd><p>the flow.</p>
+</dd>
+</dl>
+</li>
+</ul>
+</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.10)">tuple</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="normalizing_flows.simple_regression.simple_flow.SimpleFlow.get_max_deviation">
+<code class="sig-name descname">get_max_deviation</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">weights</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/simple_regression/simple_flow.html#SimpleFlow.get_max_deviation"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.simple_regression.simple_flow.SimpleFlow.get_max_deviation" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get maximum deviation between forward and backward passes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch v1.12)"><em>torch.Tensor</em></a>) – The forward inputs.</p></li>
+<li><p><strong>weights</strong> – The weights of the layer.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The maximum absolute deviation across the batch.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.10)">float</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="normalizing_flows.simple_regression.simple_flow.SimpleFlow.inverse">
+<code class="sig-name descname">inverse</code><span class="sig-paren">(</span><em class="sig-param">u</em>, <em class="sig-param">weights</em>, <em class="sig-param">preprocessed=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/simple_regression/simple_flow.html#SimpleFlow.inverse"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.simple_regression.simple_flow.SimpleFlow.inverse" title="Permalink to this definition">¶</a></dt>
+<dd><p>Inverse pass through the flow.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>(</strong><strong>...</strong><strong>)</strong> – See docstring of method <a class="reference internal" href="#normalizing_flows.simple_regression.simple_flow.SimpleFlow.forward" title="normalizing_flows.simple_regression.simple_flow.SimpleFlow.forward"><code class="xref py py-func docutils literal notranslate"><span class="pre">forward()</span></code></a>.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>See docstring of method <a class="reference internal" href="#normalizing_flows.simple_regression.simple_flow.SimpleFlow.forward" title="normalizing_flows.simple_regression.simple_flow.SimpleFlow.forward"><code class="xref py py-func docutils literal notranslate"><span class="pre">forward()</span></code></a>.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(…)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="normalizing_flows.simple_regression.simple_flow.SimpleFlow.log_p0">
+<code class="sig-name descname">log_p0</code><span class="sig-paren">(</span><em class="sig-param">u</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/simple_regression/simple_flow.html#SimpleFlow.log_p0"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.simple_regression.simple_flow.SimpleFlow.log_p0" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the log of the probability of the input.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>u</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch v1.12)"><em>torch.Tensor</em></a>) – The sample for which to evaluate the probability.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The probability.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.10)">float</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="normalizing_flows.simple_regression.simple_flow.SimpleFlow.sample_p0">
+<code class="sig-name descname">sample_p0</code><span class="sig-paren">(</span><em class="sig-param">n</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/simple_regression/simple_flow.html#SimpleFlow.sample_p0"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.simple_regression.simple_flow.SimpleFlow.sample_p0" title="Permalink to this definition">¶</a></dt>
+<dd><p>Same from the base distribution.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>n</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.10)"><em>int</em></a>) – The number of samples to get.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The samples.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch v1.12)">torch.Tensor</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="normalizing_flows.simple_regression.simple_flow.SimpleFlow.to">
+<code class="sig-name descname">to</code><span class="sig-paren">(</span><em class="sig-param">*args</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/simple_regression/simple_flow.html#SimpleFlow.to"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.simple_regression.simple_flow.SimpleFlow.to" title="Permalink to this definition">¶</a></dt>
+<dd><p>Move model to specific device.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<span class="target" id="module-normalizing_flows.simple_regression.layers.splines"></span><div class="section" id="spline-layer-to-be-used-for-normalizing-flows">
+<h3><a class="toc-backref" href="#id19">Spline layer to be used for normalizing flows</a><a class="headerlink" href="#spline-layer-to-be-used-for-normalizing-flows" title="Permalink to this headline">¶</a></h3>
+<p>Original code by Francesco d’Angelo and Rafael Daetwyler, adapted from
+<a class="reference external" href="https://github.com/bayesiains/nflows">https://github.com/bayesiains/nflows</a>.</p>
+<dl class="class">
+<dt id="normalizing_flows.simple_regression.layers.splines.PiecewiseRationalQuadraticCDF">
+<em class="property">class </em><code class="sig-prename descclassname">normalizing_flows.simple_regression.layers.splines.</code><code class="sig-name descname">PiecewiseRationalQuadraticCDF</code><span class="sig-paren">(</span><em class="sig-param">shape</em>, <em class="sig-param">num_bins=10</em>, <em class="sig-param">tails=None</em>, <em class="sig-param">tail_bound=1.0</em>, <em class="sig-param">min_bin_width=0.001</em>, <em class="sig-param">min_bin_height=0.001</em>, <em class="sig-param">min_derivative=0.001</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/simple_regression/layers/splines.html#PiecewiseRationalQuadraticCDF"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.simple_regression.layers.splines.PiecewiseRationalQuadraticCDF" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">nflows.transforms.base.Transform</span></code></p>
+<p>Implementation of a piecewise rational quadratic CDF.</p>
+<p>This class can be used as a layer for a normalizing flow.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>shape</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.10)"><em>int</em></a>) – The size of the inputs and outputs.</p></li>
+<li><p><strong>num_bins</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.10)"><em>int</em></a>) – The number of spline segments.</p></li>
+<li><p><strong>tails</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.10)"><em>str</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.10)"><em>None</em></a>) – The type of tails used. If <code class="docutils literal notranslate"><span class="pre">linear</span></code>, no
+derivatives will be used at the tails.</p></li>
+<li><p><strong>max_bin_width</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.10)"><em>float</em></a>) – The maximum bin width.</p></li>
+<li><p><strong>min_bin_width</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.10)"><em>float</em></a>) – The minimum bin width.</p></li>
+<li><p><strong>min_derivative</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.10)"><em>float</em></a>) – The minimum derivative in the segments.</p></li>
+</ul>
+</dd>
+</dl>
+<p>Initializes internal Module state, shared by both nn.Module and ScriptModule.</p>
+<dl class="method">
+<dt id="normalizing_flows.simple_regression.layers.splines.PiecewiseRationalQuadraticCDF.forward">
+<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">inputs</em>, <em class="sig-param">context=None</em>, <em class="sig-param">single_layer=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/simple_regression/layers/splines.html#PiecewiseRationalQuadraticCDF.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.simple_regression.layers.splines.PiecewiseRationalQuadraticCDF.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Forward pass through the spline.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>inputs</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch v1.12)"><em>torch.Tensor</em></a>) – The inputs.</p></li>
+<li><p><strong>context</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.10)"><em>list</em></a>) – <p>Miscellaneous information. It is a list of length
+four containing:</p>
+<ul>
+<li><p>the parameters (weights and biases) of the</p></li>
+<li><p>the index of the layer</p></li>
+<li><p>the nonlinearity</p></li>
+<li><p>a dictionary of remaining kwargs</p></li>
+</ul>
+</p></li>
+<li><p><strong>single_layer</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.10)"><em>bool</em></a>) – Whether the context corresponds to a
+single layer or all layers.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The output.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch v1.12)">torch.Tensor</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="normalizing_flows.simple_regression.layers.splines.PiecewiseRationalQuadraticCDF.get_param_shapes">
+<code class="sig-name descname">get_param_shapes</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/simple_regression/layers/splines.html#PiecewiseRationalQuadraticCDF.get_param_shapes"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.simple_regression.layers.splines.PiecewiseRationalQuadraticCDF.get_param_shapes" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the shapes of the trainable parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><dl class="simple">
+<dt>The unnormalized widths, heights and derivatives at each</dt><dd><p>spline segment.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>(<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.10)">list</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="normalizing_flows.simple_regression.layers.splines.PiecewiseRationalQuadraticCDF.inverse">
+<code class="sig-name descname">inverse</code><span class="sig-paren">(</span><em class="sig-param">inputs</em>, <em class="sig-param">context=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/simple_regression/layers/splines.html#PiecewiseRationalQuadraticCDF.inverse"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.simple_regression.layers.splines.PiecewiseRationalQuadraticCDF.inverse" title="Permalink to this definition">¶</a></dt>
+<dd><p>Inverse pass through the spline.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>inputs</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch v1.12)"><em>torch.Tensor</em></a>) – The inputs.</p></li>
+<li><p><strong>context</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.10)"><em>list</em></a>) – The context for the computation.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The output.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch v1.12)">torch.Tensor</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="normalizing_flows.simple_regression.layers.splines.PiecewiseRationalQuadraticCDF.preprocess_weights">
+<code class="sig-name descname">preprocess_weights</code><span class="sig-paren">(</span><em class="sig-param">weights</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/simple_regression/layers/splines.html#PiecewiseRationalQuadraticCDF.preprocess_weights"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.simple_regression.layers.splines.PiecewiseRationalQuadraticCDF.preprocess_weights" title="Permalink to this definition">¶</a></dt>
+<dd><p>Preprocess the weights.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>weights</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch v1.12)"><em>torch.Tensor</em></a>) – The weights.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><p>Tuple containing:</p>
+<p>-<strong>uw</strong>: The unnormalized widths.
+-<strong>uh</strong>: The unnormalized heights.
+-<strong>ud</strong>: The unnormalized derivatives.</p>
+</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.10)">tuple</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<span class="target" id="module-normalizing_flows.simple_regression.layers.perceptron"></span><div class="section" id="perceptron-for-a-normalizing-flow">
+<h3><a class="toc-backref" href="#id20">Perceptron for a normalizing flow</a><a class="headerlink" href="#perceptron-for-a-normalizing-flow" title="Permalink to this headline">¶</a></h3>
+<p>Original code by Francesco d’Angelo and Rafael Daetwyler.</p>
+<dl class="class">
+<dt id="normalizing_flows.simple_regression.layers.perceptron.Perceptron">
+<em class="property">class </em><code class="sig-prename descclassname">normalizing_flows.simple_regression.layers.perceptron.</code><code class="sig-name descname">Perceptron</code><a class="reference internal" href="_modules/normalizing_flows/simple_regression/layers/perceptron.html#Perceptron"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.simple_regression.layers.perceptron.Perceptron" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">nflows.transforms.base.Transform</span></code></p>
+<p>Implementation of a perceptron layer for normalizing flows.</p>
+<p>Initializes internal Module state, shared by both nn.Module and ScriptModule.</p>
+<dl class="method">
+<dt id="normalizing_flows.simple_regression.layers.perceptron.Perceptron.forward">
+<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">inputs</em>, <em class="sig-param">context</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/simple_regression/layers/perceptron.html#Perceptron.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.simple_regression.layers.perceptron.Perceptron.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Forward pass through the layer.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>input</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch v1.12)"><em>torch.Tensor</em></a>) – The inputs to the layer.</p></li>
+<li><p><strong>context</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.10)"><em>list</em></a>) – <p>Miscellaneous information. It is a list of length
+four containing:</p>
+<ul>
+<li><p>the parameters (weights and biases) of the</p></li>
+<li><p>the index of the layer</p></li>
+<li><p>the nonlinearity</p></li>
+<li><p>a dictionary of remaining kwargs</p></li>
+</ul>
+</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><p>Tuple containing:</p>
+<ul class="simple">
+<li><p><strong>output</strong>: The output of the layer.</p></li>
+<li><p><strong>logabsdet</strong>: The log of the absolute values of the derivative.</p></li>
+</ul>
+</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.10)">tuple</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="normalizing_flows.simple_regression.layers.perceptron.Perceptron.inverse">
+<code class="sig-name descname">inverse</code><span class="sig-paren">(</span><em class="sig-param">inputs</em>, <em class="sig-param">context</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/simple_regression/layers/perceptron.html#Perceptron.inverse"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.simple_regression.layers.perceptron.Perceptron.inverse" title="Permalink to this definition">¶</a></dt>
+<dd><p>Inverse pass through the layer.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>input</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch v1.12)"><em>torch.Tensor</em></a>) – The (inverse) inputs to the layer.</p></li>
+<li><p><strong>(</strong><strong>...</strong><strong>)</strong> – See docstring of function <a class="reference internal" href="#normalizing_flows.simple_regression.layers.perceptron.Perceptron.forward" title="normalizing_flows.simple_regression.layers.perceptron.Perceptron.forward"><code class="xref py py-func docutils literal notranslate"><span class="pre">forward()</span></code></a>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><p>Tuple containing:</p>
+<ul class="simple">
+<li><p><strong>output</strong>: The output of the layer.</p></li>
+<li><p><strong>logabsdet</strong>: The log of the absolute values of the derivative.</p></li>
+</ul>
+</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.10)">tuple</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="normalizing_flows.simple_regression.layers.perceptron.Perceptron.make_invertible">
+<em class="property">static </em><code class="sig-name descname">make_invertible</code><span class="sig-paren">(</span><em class="sig-param">w</em>, <em class="sig-param">eps=1e-06</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/simple_regression/layers/perceptron.html#Perceptron.make_invertible"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.simple_regression.layers.perceptron.Perceptron.make_invertible" title="Permalink to this definition">¶</a></dt>
+<dd><p>Make weight matrix invetible.</p>
+<p>Ensures that all weight magnitues are at least <cite>eps</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>w</strong> – The weight matrix.</p></li>
+<li><p><strong>eps</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.10)"><em>float</em></a>) – The value to be added to the weights.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The weights.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="normalizing_flows.simple_regression.layers.perceptron.Perceptron.preprocess_weights">
+<em class="property">static </em><code class="sig-name descname">preprocess_weights</code><span class="sig-paren">(</span><em class="sig-param">weights</em>, <em class="sig-param">bias</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/simple_regression/layers/perceptron.html#Perceptron.preprocess_weights"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.simple_regression.layers.perceptron.Perceptron.preprocess_weights" title="Permalink to this definition">¶</a></dt>
+<dd><p>Preprocess the weights.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>weights</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch v1.12)"><em>torch.Tensor</em></a>) – The weights.</p></li>
+<li><p><strong>bias</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.10)"><em>bool</em></a>) – Whether a bias term exists.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><p>Tuple containing:</p>
+<p>-<strong>w_weights</strong>: The weights.
+-<strong>b_weights</strong>: The biases.</p>
+</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.10)">tuple</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<span class="target" id="module-normalizing_flows.simple_regression.bivariate_flow"></span><div class="section" id="bivariate-normalizing-flow-for-2d-regression-experiments">
+<h3><a class="toc-backref" href="#id21">Bivariate normalizing flow for 2D regression experiments</a><a class="headerlink" href="#bivariate-normalizing-flow-for-2d-regression-experiments" title="Permalink to this headline">¶</a></h3>
+<p>Original code by Hamza Keurti.</p>
+<dl class="class">
+<dt id="normalizing_flows.simple_regression.bivariate_flow.BivariateFlow">
+<em class="property">class </em><code class="sig-prename descclassname">normalizing_flows.simple_regression.bivariate_flow.</code><code class="sig-name descname">BivariateFlow</code><span class="sig-paren">(</span><em class="sig-param">depth</em>, <em class="sig-param">permute=None</em>, <em class="sig-param">layers='perceptron'</em>, <em class="sig-param">conditioner_arch='10</em>, <em class="sig-param">10'</em>, <em class="sig-param">activation_fn=&lt;class 'normalizing_flows.simple_regression.diffeomorphisms.leaky_relu.LeakyReLU'&gt;</em>, <em class="sig-param">use_bias=True</em>, <em class="sig-param">in_fn=None</em>, <em class="sig-param">out_fn=&lt;class 'normalizing_flows.simple_regression.diffeomorphisms.log_transform.LogTransform'&gt;</em>, <em class="sig-param">spline_bound=1.0</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/simple_regression/bivariate_flow.html#BivariateFlow"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.simple_regression.bivariate_flow.BivariateFlow" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">hypnettorch.mnets.mlp.MLP</span></code></p>
+<p>Implementation of a multi-dimensional normalizing flow.</p>
+<p>This is a normalizing flow based on our simple 1-D version, but that allows
+having outputs with higher dimensions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>(</strong><strong>...</strong><strong>)</strong> – See docstring of class <code class="xref py py-class docutils literal notranslate"><span class="pre">simple_flow</span></code>.</p>
+</dd>
+</dl>
+<dl class="method">
+<dt id="normalizing_flows.simple_regression.bivariate_flow.BivariateFlow.forward">
+<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">t</em>, <em class="sig-param">weights</em>, <em class="sig-param">preprocessed=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/simple_regression/bivariate_flow.html#BivariateFlow.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.simple_regression.bivariate_flow.BivariateFlow.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Forward pass through the flow.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>t</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch v1.12)"><em>torch.Tensor</em></a>) – The inputs to the flow.</p></li>
+<li><p><strong>weights</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch v1.12)"><em>torch.Tensor</em></a>) – The weights of the flow.</p></li>
+<li><p><strong>preprocessed</strong> – Whether the weights have been preprocessed.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><p>Tuple containing:</p>
+<ul class="simple">
+<li><p><strong>u</strong>: The output of the flow.</p></li>
+<li><dl class="simple">
+<dt><strong>logabsdet</strong>: The absolute value of the log of the Jacobian of</dt><dd><p>the flow.</p>
+</dd>
+</dl>
+</li>
+</ul>
+</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.10)">tuple</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="normalizing_flows.simple_regression.bivariate_flow.BivariateFlow.inverse">
+<code class="sig-name descname">inverse</code><span class="sig-paren">(</span><em class="sig-param">u</em>, <em class="sig-param">weights</em>, <em class="sig-param">preprocessed=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/simple_regression/bivariate_flow.html#BivariateFlow.inverse"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.simple_regression.bivariate_flow.BivariateFlow.inverse" title="Permalink to this definition">¶</a></dt>
+<dd><p>Inverse pass through the flow.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>(</strong><strong>...</strong><strong>)</strong> – See docstring of method <a class="reference internal" href="#normalizing_flows.simple_regression.bivariate_flow.BivariateFlow.forward" title="normalizing_flows.simple_regression.bivariate_flow.BivariateFlow.forward"><code class="xref py py-func docutils literal notranslate"><span class="pre">forward()</span></code></a>.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>See docstring of method <a class="reference internal" href="#normalizing_flows.simple_regression.bivariate_flow.BivariateFlow.forward" title="normalizing_flows.simple_regression.bivariate_flow.BivariateFlow.forward"><code class="xref py py-func docutils literal notranslate"><span class="pre">forward()</span></code></a>.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(…)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="normalizing_flows.simple_regression.bivariate_flow.BivariateFlow.log_p0">
+<code class="sig-name descname">log_p0</code><span class="sig-paren">(</span><em class="sig-param">u</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/simple_regression/bivariate_flow.html#BivariateFlow.log_p0"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.simple_regression.bivariate_flow.BivariateFlow.log_p0" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the log of the probability of the input.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>u</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch v1.12)"><em>torch.Tensor</em></a>) – The sample for which to evaluate the probability.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The probability.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.10)">float</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="normalizing_flows.simple_regression.bivariate_flow.BivariateFlow.to">
+<code class="sig-name descname">to</code><span class="sig-paren">(</span><em class="sig-param">*args</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/normalizing_flows/simple_regression/bivariate_flow.html#BivariateFlow.to"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#normalizing_flows.simple_regression.bivariate_flow.BivariateFlow.to" title="Permalink to this definition">¶</a></dt>
+<dd><p>Move model to specific device.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">regression_uncertainty_mm</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents of this repository:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="gaussian_likelihoods.html">Gaussian Likelihoods</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Normalizing Flows</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#general-notes">General Notes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-normalizing_flows.train_utils">API</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="networks.html">Networks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="probabilistic.html">Probabilistic</a></li>
+<li class="toctree-l1"><a class="reference internal" href="datasets.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="utils.html">Utilities</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="gaussian_likelihoods.html" title="previous chapter">Regression experiments with Gaussian Likelihoods</a></li>
+      <li>Next: <a href="networks.html" title="next chapter">Networks</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2021, Maria R. Cervera, Rafael Daetwyler, Hamza Keurti, Francesco dAngelo, Christian Henning.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/norm_flow.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

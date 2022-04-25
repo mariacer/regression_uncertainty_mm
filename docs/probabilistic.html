@@ -1,0 +1,420 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Probabilistic &#8212; regression_uncertainty_mm 0.1 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Datasets" href="datasets.html" />
+    <link rel="prev" title="Networks" href="networks.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="probabilistic">
+<span id="probabilistic-reference-label"></span><h1><a class="toc-backref" href="#id1">Probabilistic</a><a class="headerlink" href="#probabilistic" title="Permalink to this headline">¶</a></h1>
+<div class="contents topic" id="contents">
+<p class="topic-title first">Contents</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#probabilistic" id="id1">Probabilistic</a></p>
+<ul>
+<li><p><a class="reference internal" href="#module-probabilistic.prob_utils" id="id2">API</a></p>
+<ul>
+<li><p><a class="reference internal" href="#helper-functions-when-working-with-bayesian-neural-networks" id="id3">Helper functions when working with Bayesian Neural Networks</a></p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+<p>This module contains all relevant functions to generate probabilistic extensions of the models.</p>
+<div class="section" id="module-probabilistic.prob_utils">
+<span id="api"></span><h2><a class="toc-backref" href="#id2">API</a><a class="headerlink" href="#module-probabilistic.prob_utils" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="helper-functions-when-working-with-bayesian-neural-networks">
+<h3><a class="toc-backref" href="#id3">Helper functions when working with Bayesian Neural Networks</a><a class="headerlink" href="#helper-functions-when-working-with-bayesian-neural-networks" title="Permalink to this headline">¶</a></h3>
+<dl class="function">
+<dt id="probabilistic.prob_utils.decode_and_sample_diag_gauss">
+<code class="sig-prename descclassname">probabilistic.prob_utils.</code><code class="sig-name descname">decode_and_sample_diag_gauss</code><span class="sig-paren">(</span><em class="sig-param">mean</em>, <em class="sig-param">rho</em>, <em class="sig-param">logvar_enc=False</em>, <em class="sig-param">generator=None</em>, <em class="sig-param">is_radial=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/probabilistic/prob_utils.html#decode_and_sample_diag_gauss"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#probabilistic.prob_utils.decode_and_sample_diag_gauss" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sample from a Gaussian distribution with diagonal covariance.</p>
+<p>The covariance of the distribution is given in an encoded form <img class="math" src="_images/math/27dc86f9f1b1c3435b2403a869b5870c582facea.png" alt="\rho"/>.
+This method will assume that the standard deviation can be retrieved via
+a softplus operation</p>
+<div class="math">
+<p><img src="_images/math/9648973ebc812e896314975cf77e669087860692.png" alt="\sigma = \text{softplus} (\rho)"/></p>
+</div><p>Except if it is assumed that <img class="math" src="_images/math/21dbb4cef70e602db8c85016ba89020982c224a0.png" alt="rho"/> (<code class="docutils literal notranslate"><span class="pre">rho</span></code>) encodes the log-variance
+(parameter <code class="docutils literal notranslate"><span class="pre">logvar_enc</span></code>), in which case the standard deviation is
+retrieved via</p>
+<div class="math">
+<p><img src="_images/math/fc9eeeeb0a4a95573a7eb565a05146b0fdb1b0d4.png" alt="\sigma = \exp (\frac{1}{2} \rho)"/></p>
+</div><p>The samples are drawn according to <img class="math" src="_images/math/2c0fa461c9a42e660d6f7756846a79e378012a10.png" alt="\mathcal{N}(\mu, I \sigma^2)"/>,
+except if <code class="docutils literal notranslate"><span class="pre">is_radial</span></code> is <code class="docutils literal notranslate"><span class="pre">True</span></code>, in which case they are sampled
+according to</p>
+<div class="math">
+<p><img src="_images/math/4b8f16ab4337501e092478fe7ad1a61762ad9a7b.png" alt="\mathbf{w} = \mathbf{\mu} + \mathbf{\sigma} \odot \
+\frac{\epsilon_{MFVI}}{\mid\mid \epsilon_{MFVI} \mid\mid} \cdot r"/></p>
+</div><p>where <img class="math" src="_images/math/4cc0d0c63e74ebd3206eba5b6365f078f836285f.png" alt="\epsilon_{MFVI} \sim \mathcal{N} (0, \mathbf{I})"/>,
+<img class="math" src="_images/math/0817cecc84aa19ca5f21b880986ccfe1a12b1993.png" alt="r \sim \mathcal{N} (0, 1)"/>, and the norm of <img class="math" src="_images/math/d80a4fee1c2616457216e97d610ad5c3a57b936d.png" alt="\epsilon_{MFVI}"/>
+is computed per parameter tensor (e.g., for the weights or the biases of
+each layer). Also <img class="math" src="_images/math/79a3d439d28652c547386f39b555d90d3aaf102d.png" alt="r"/> is resampled for every parameter tensor.</p>
+<p>When drawing many samples, it might be more efficient to use a combination
+of functions <a class="reference internal" href="#probabilistic.prob_utils.decode_diag_gauss" title="probabilistic.prob_utils.decode_diag_gauss"><code class="xref py py-func docutils literal notranslate"><span class="pre">decode_diag_gauss()</span></code></a> and <a class="reference internal" href="#probabilistic.prob_utils.sample_diag_gauss" title="probabilistic.prob_utils.sample_diag_gauss"><code class="xref py py-func docutils literal notranslate"><span class="pre">sample_diag_gauss()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mean</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.10)"><em>list</em></a>) – List of tensors (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch v1.12)"><code class="xref py py-class docutils literal notranslate"><span class="pre">torch.Tensor</span></code></a>), that represent
+the mean of the Gaussian distribution.</p></li>
+<li><p><strong>rho</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.10)"><em>list</em></a>) – List of tensors, that represent the encoded variance
+<img class="math" src="_images/math/27dc86f9f1b1c3435b2403a869b5870c582facea.png" alt="\rho"/>.</p></li>
+<li><p><strong>logvar_enc</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.10)"><em>bool</em></a>) – Whether the encoded variances <code class="docutils literal notranslate"><span class="pre">rho</span></code> represent
+log-variances.</p></li>
+<li><p><strong>generator</strong> (<a class="reference external" href="https://pytorch.org/docs/master/generated/torch.Generator.html#torch.Generator" title="(in PyTorch v1.12)"><em>torch.Generator</em></a><em>, </em><em>optional</em>) – A generator can be passed to
+obtain more control over the reproducibility of the random sampling
+process.</p></li>
+<li><p><strong>is_radial</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.10)"><em>bool</em></a><em>, </em><em>optional</em>) – If <code class="docutils literal notranslate"><span class="pre">True</span></code>, the weights will be sampled
+according to a radial distribution, and not a Gaussian one.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>A sample from the desired distribution, retrieved via the
+reparametrization trick.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.10)">list</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="probabilistic.prob_utils.decode_diag_gauss">
+<code class="sig-prename descclassname">probabilistic.prob_utils.</code><code class="sig-name descname">decode_diag_gauss</code><span class="sig-paren">(</span><em class="sig-param">rho</em>, <em class="sig-param">logvar_enc=False</em>, <em class="sig-param">return_var=False</em>, <em class="sig-param">return_logvar=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/probabilistic/prob_utils.html#decode_diag_gauss"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#probabilistic.prob_utils.decode_diag_gauss" title="Permalink to this definition">¶</a></dt>
+<dd><p>Decode the standard deviation for a Gaussian distribution with diagonal
+covariance.</p>
+<p>We consider a Gaussian distribution where the covariance is encoded in
+<img class="math" src="_images/math/27dc86f9f1b1c3435b2403a869b5870c582facea.png" alt="\rho"/> (<code class="docutils literal notranslate"><span class="pre">rho</span></code>) as real numbers. We can extract the standard
+deviation from <img class="math" src="_images/math/27dc86f9f1b1c3435b2403a869b5870c582facea.png" alt="\rho"/> as described in the documentation of
+<a class="reference internal" href="#probabilistic.prob_utils.decode_and_sample_diag_gauss" title="probabilistic.prob_utils.decode_and_sample_diag_gauss"><code class="xref py py-func docutils literal notranslate"><span class="pre">decode_and_sample_diag_gauss()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>(</strong><strong>...</strong><strong>)</strong> – See docstring of function <a class="reference internal" href="#probabilistic.prob_utils.decode_and_sample_diag_gauss" title="probabilistic.prob_utils.decode_and_sample_diag_gauss"><code class="xref py py-func docutils literal notranslate"><span class="pre">decode_and_sample_diag_gauss()</span></code></a>.</p></li>
+<li><p><strong>return_var</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.10)"><em>bool</em></a><em>, </em><em>optional</em>) – If <code class="docutils literal notranslate"><span class="pre">True</span></code>, the variance <img class="math" src="_images/math/5406eadc281dbd20de843b0034c8497320dae5cb.png" alt="\sigma^2"/>
+will be returned as well.</p></li>
+<li><p><strong>return_logvar</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.10)"><em>bool</em></a><em>, </em><em>optional</em>) – If <code class="docutils literal notranslate"><span class="pre">True</span></code>, the log-variance
+<img class="math" src="_images/math/39a84828afb46a308e1de6d52f269a674c912df0.png" alt="\log\sigma^2"/> will be returned as well.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><p>Tuple containing:</p>
+<ul class="simple">
+<li><p><strong>std</strong> (list): The standard deviation <img class="math" src="_images/math/b52df27bfb0b1e3af0c2c68a7b9da459178c2a7d.png" alt="\sigma"/>.</p></li>
+<li><p><strong>var</strong> (list, optional): The variance <img class="math" src="_images/math/5406eadc281dbd20de843b0034c8497320dae5cb.png" alt="\sigma^2"/>. See argument
+<code class="docutils literal notranslate"><span class="pre">return_var</span></code>.</p></li>
+<li><p><strong>logvar</strong> (list, optional): The log-variance <img class="math" src="_images/math/39a84828afb46a308e1de6d52f269a674c912df0.png" alt="\log\sigma^2"/>.
+See argument <code class="docutils literal notranslate"><span class="pre">return_logvar</span></code>.</p></li>
+</ul>
+</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.10)">tuple</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="probabilistic.prob_utils.extract_mean_std">
+<code class="sig-prename descclassname">probabilistic.prob_utils.</code><code class="sig-name descname">extract_mean_std</code><span class="sig-paren">(</span><em class="sig-param">hnet_outputs</em>, <em class="sig-param">return_logvar=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/probabilistic/prob_utils.html#extract_mean_std"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#probabilistic.prob_utils.extract_mean_std" title="Permalink to this definition">¶</a></dt>
+<dd><p>Extract mean and standard deviation for a multivariate Gaussian
+distribution with diagonal covaiance matrix from a hypernetwork that outputs
+mean and log-variance.</p>
+<div class="deprecated">
+<p><span class="versionmodified deprecated">Deprecated since version 1.0: </span>Please use a main network wrapper such as
+<code class="xref py py-class docutils literal notranslate"><span class="pre">probabilistic.gauss_mnet_interface.GaussianBNNWrapper</span></code> or the
+function <a class="reference internal" href="#probabilistic.prob_utils.decode_diag_gauss" title="probabilistic.prob_utils.decode_diag_gauss"><code class="xref py py-func docutils literal notranslate"><span class="pre">decode_diag_gauss()</span></code></a> rather than working with
+the hypernet output directly.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hnet_outputs</strong> – See docstring of method <code class="xref py py-func docutils literal notranslate"><span class="pre">sample_diag_gaus_weights()</span></code>.</p></li>
+<li><p><strong>return_logvar</strong> (<em>optional</em>) – If set, a third value will be returned,
+corresponding to the log-variance.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><cite>mean</cite> and <cite>std</cite>.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>Two lists of tensors</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="probabilistic.prob_utils.kl_diag_gauss_with_standard_gauss">
+<code class="sig-prename descclassname">probabilistic.prob_utils.</code><code class="sig-name descname">kl_diag_gauss_with_standard_gauss</code><span class="sig-paren">(</span><em class="sig-param">mean</em>, <em class="sig-param">logvar</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/probabilistic/prob_utils.html#kl_diag_gauss_with_standard_gauss"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#probabilistic.prob_utils.kl_diag_gauss_with_standard_gauss" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the KL divergence between an arbitrary diagonal Gaussian
+distributions and a Gaussian with zero mean and unit variance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mean</strong> – Mean tensors of the distribution (see argument <cite>mean</cite> of
+method <a class="reference internal" href="#probabilistic.prob_utils.sample_diag_gauss" title="probabilistic.prob_utils.sample_diag_gauss"><code class="xref py py-func docutils literal notranslate"><span class="pre">sample_diag_gauss()</span></code></a>).</p></li>
+<li><p><strong>logvar</strong> – Log-variance tensors with the same shapes as the <cite>mean</cite>
+tensors.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The analytically computed KL divergence between these distributions.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="probabilistic.prob_utils.kl_diag_gaussians">
+<code class="sig-prename descclassname">probabilistic.prob_utils.</code><code class="sig-name descname">kl_diag_gaussians</code><span class="sig-paren">(</span><em class="sig-param">mean_a</em>, <em class="sig-param">logvar_a</em>, <em class="sig-param">mean_b</em>, <em class="sig-param">logvar_b</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/probabilistic/prob_utils.html#kl_diag_gaussians"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#probabilistic.prob_utils.kl_diag_gaussians" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the KL divergence between 2 diagonal Gaussian distributions.</p>
+<div class="math">
+<p><img src="_images/math/51db04024521fb9e104cef81b2ff51ec01b12370.png" alt="KL \big( p_a(\cdot) \mid\mid  p_b(\cdot) \big)"/></p>
+</div><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mean_a</strong> – Mean tensors of the first distribution (see argument <cite>mean</cite> of
+method <a class="reference internal" href="#probabilistic.prob_utils.sample_diag_gauss" title="probabilistic.prob_utils.sample_diag_gauss"><code class="xref py py-func docutils literal notranslate"><span class="pre">sample_diag_gauss()</span></code></a>).</p></li>
+<li><p><strong>logvar_a</strong> – Log-variance tensors with the same shapes as the <cite>mean_a</cite>
+tensors.</p></li>
+<li><p><strong>mean_b</strong> – Same as <cite>mean_a</cite> for second distribution.</p></li>
+<li><p><strong>logvar_b</strong> – Same as <cite>logvar_a</cite> for second distribution.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The analytically computed KL divergence between these distributions.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="probabilistic.prob_utils.kl_radial_bnn_with_diag_gauss">
+<code class="sig-prename descclassname">probabilistic.prob_utils.</code><code class="sig-name descname">kl_radial_bnn_with_diag_gauss</code><span class="sig-paren">(</span><em class="sig-param">mean_a</em>, <em class="sig-param">std_a</em>, <em class="sig-param">mean_b</em>, <em class="sig-param">std_b</em>, <em class="sig-param">ce_sample_size=10</em>, <em class="sig-param">generator=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/probabilistic/prob_utils.html#kl_radial_bnn_with_diag_gauss"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#probabilistic.prob_utils.kl_radial_bnn_with_diag_gauss" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the KL divergence between one radial BNN distribution and one
+diagonal Gaussian distribution.</p>
+<p>For a radial BNN distribution <img class="math" src="_images/math/e837dd5e02f06f0ceea2dc93284042f7efb24265.png" alt="p_a(\cdot)"/> and a Gaussian distribution
+<img class="math" src="_images/math/3742daecba4d05e364c129c3e532142d24cf62ef.png" alt="p_b(\cdot)"/>, the expression is given by</p>
+<div class="math">
+<p><img src="_images/math/142d5c01e95979b9c276c605ec9497c3bbe80cc5.png" alt="KL \big( p_a(\cdot) \mid\mid  p_b(\cdot) \big) = \
+\int p_a(\cdot) \log{p_a(\cdot)} \,d\cdot - \
+\int p_a(\cdot) \log{p_b(\cdot)} \,d\cdot = \
+- h(p_a(\cdot)) + h(p_a(\cdot), p_b(\cdot))"/></p>
+</div><p>where <img class="math" src="_images/math/f5aafd87c71cb770efd50f453301a638e24e9058.png" alt="h(p_a(\cdot))"/> denotes the entropy of <img class="math" src="_images/math/e837dd5e02f06f0ceea2dc93284042f7efb24265.png" alt="p_a(\cdot)"/> and
+<img class="math" src="_images/math/2f204d63e155f35a0fca3b9fd123c0adf7cba111.png" alt="h(p_a(\cdot), p_b(\cdot))"/> the cross-entropy between
+<img class="math" src="_images/math/e837dd5e02f06f0ceea2dc93284042f7efb24265.png" alt="p_a(\cdot)"/> and <img class="math" src="_images/math/3742daecba4d05e364c129c3e532142d24cf62ef.png" alt="p_b(\cdot)"/>.</p>
+<p><strong>Entropy</strong></p>
+<p>Since <img class="math" src="_images/math/e837dd5e02f06f0ceea2dc93284042f7efb24265.png" alt="p_a(\cdot)"/> is a radial BNN distribution its entropy can be
+computed analytically according to</p>
+<div class="math">
+<p><img src="_images/math/bf7ab0581f3836f82ba1c65a171a430416c59879.png" alt="h(p_a(\cdot)) = \sum_{i} \log [\sigma^{a}_i] + const"/></p>
+</div><p>as described in Eq.5 from
+<a class="reference external" href="https://arxiv.org/abs/1907.00865">Farquhar et al.</a>, where <img class="math" src="_images/math/5aa339d4daf45a810dda332e3c80a0698e526e04.png" alt="i"/> is
+a sum over the weights.</p>
+<p><strong>Cross-entropy</strong></p>
+<p>The cross-entropy term can be estimated taking <img class="math" src="_images/math/3bfb3a64189a14b2704f4610827762d5e3145114.png" alt="N"/> Monte-Carlo samples
+from <img class="math" src="_images/math/e837dd5e02f06f0ceea2dc93284042f7efb24265.png" alt="p_a(\cdot)"/> and averaging their log-probability under
+<img class="math" src="_images/math/3742daecba4d05e364c129c3e532142d24cf62ef.png" alt="p_b(\cdot)"/>.</p>
+<div class="math">
+<p><img src="_images/math/66971fe9b97e942f831d0ce03c8496fd20358560.png" alt="h(p_a(\cdot), p_b(\cdot)) \approx \
+    - \frac{1}{N} \sum_{n}^{N} \log[p_b(\cdot^{(n)})]"/></p>
+</div><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mean_a</strong> – Mean tensors of the radial BNN distribution (see argument <cite>mean</cite>
+of method <a class="reference internal" href="#probabilistic.prob_utils.sample_diag_gauss" title="probabilistic.prob_utils.sample_diag_gauss"><code class="xref py py-func docutils literal notranslate"><span class="pre">sample_diag_gauss()</span></code></a>).</p></li>
+<li><p><strong>std_a</strong> – The standard deviation <img class="math" src="_images/math/b52df27bfb0b1e3af0c2c68a7b9da459178c2a7d.png" alt="\sigma"/> with the same shapes as the
+<cite>mean_a</cite> tensors.</p></li>
+<li><p><strong>mean_b</strong> – Same as <cite>mean_a</cite> for diagonal Gaussian distribution.</p></li>
+<li><p><strong>std_b</strong> – Same as <cite>std_a</cite> for diagonal Gaussian distribution.</p></li>
+<li><p><strong>ce_sample_size</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.10)"><em>int</em></a><em>, </em><em>optional</em>) – The number of weight samples to draw to
+estimate the cross-entropy term of the KL.</p></li>
+<li><p><strong>generator</strong> (<a class="reference external" href="https://pytorch.org/docs/master/generated/torch.Generator.html#torch.Generator" title="(in PyTorch v1.12)"><em>torch.Generator</em></a><em>, </em><em>optional</em>) – A generator can be passed to
+obtain more control over the reproducibility of the random sampling
+process.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The computed KL divergence between these distributions.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="probabilistic.prob_utils.sample_diag_gaus_from_hnet">
+<code class="sig-prename descclassname">probabilistic.prob_utils.</code><code class="sig-name descname">sample_diag_gaus_from_hnet</code><span class="sig-paren">(</span><em class="sig-param">hnet_outputs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/probabilistic/prob_utils.html#sample_diag_gaus_from_hnet"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#probabilistic.prob_utils.sample_diag_gaus_from_hnet" title="Permalink to this definition">¶</a></dt>
+<dd><p>This method uses the reparametrization trick to sample a set of main
+network weights assuming the output of the hypernetwork represents the
+mean and log-variances of a diagonal Gaussian distribution.</p>
+<p>When drawing many samples, it might be more efficient to use a combination
+of methods <a class="reference internal" href="#probabilistic.prob_utils.extract_mean_std" title="probabilistic.prob_utils.extract_mean_std"><code class="xref py py-func docutils literal notranslate"><span class="pre">extract_mean_std()</span></code></a> and <a class="reference internal" href="#probabilistic.prob_utils.sample_diag_gauss" title="probabilistic.prob_utils.sample_diag_gauss"><code class="xref py py-func docutils literal notranslate"><span class="pre">sample_diag_gauss()</span></code></a>.</p>
+<div class="deprecated">
+<p><span class="versionmodified deprecated">Deprecated since version 1.0: </span>Please use a main network wrapper such as
+<code class="xref py py-class docutils literal notranslate"><span class="pre">probabilistic.gauss_mnet_interface.GaussianBNNWrapper</span></code> or the
+function <a class="reference internal" href="#probabilistic.prob_utils.decode_and_sample_diag_gauss" title="probabilistic.prob_utils.decode_and_sample_diag_gauss"><code class="xref py py-func docutils literal notranslate"><span class="pre">decode_and_sample_diag_gauss()</span></code></a> rather than working with
+the hypernet output directly.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>hnet_outputs</strong> – A list of tensors. The first half of this list is
+interpreted as mean values and the second half as log variance
+values.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>A sample of the distribution represented by the hypernet output.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="probabilistic.prob_utils.sample_diag_gauss">
+<code class="sig-prename descclassname">probabilistic.prob_utils.</code><code class="sig-name descname">sample_diag_gauss</code><span class="sig-paren">(</span><em class="sig-param">mean</em>, <em class="sig-param">std</em>, <em class="sig-param">generator=None</em>, <em class="sig-param">is_radial=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/probabilistic/prob_utils.html#sample_diag_gauss"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#probabilistic.prob_utils.sample_diag_gauss" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get a sample from a multivariate Gaussian distribution with diagonal
+covariance matrix.</p>
+<p>Samples are produced using the reparametrization trick.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">is_radial</span></code> is set to <code class="docutils literal notranslate"><span class="pre">True</span></code>, samples will instead by obtained
+from a radial BNN distribution instead of a multivariate Gaussian.
+For details refer to docstring of <a class="reference internal" href="#probabilistic.prob_utils.decode_and_sample_diag_gauss" title="probabilistic.prob_utils.decode_and_sample_diag_gauss"><code class="xref py py-func docutils literal notranslate"><span class="pre">decode_and_sample_diag_gauss()</span></code></a>.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mean</strong> – A list of tensors. See return value of method
+<a class="reference internal" href="#probabilistic.prob_utils.extract_mean_std" title="probabilistic.prob_utils.extract_mean_std"><code class="xref py py-func docutils literal notranslate"><span class="pre">extract_mean_std()</span></code></a>.</p></li>
+<li><p><strong>std</strong> – A list of tensors with the same shapes as <cite>mean</cite>. See return value
+of method <a class="reference internal" href="#probabilistic.prob_utils.extract_mean_std" title="probabilistic.prob_utils.extract_mean_std"><code class="xref py py-func docutils literal notranslate"><span class="pre">extract_mean_std()</span></code></a>.</p></li>
+<li><p><strong>generator</strong> (<a class="reference external" href="https://pytorch.org/docs/master/generated/torch.Generator.html#torch.Generator" title="(in PyTorch v1.12)"><em>torch.Generator</em></a><em>, </em><em>optional</em>) – A generator can be passed to
+obtain more control over the reproducibility of the random sampling
+process.</p></li>
+<li><p><strong>is_radial</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.10)"><em>bool</em></a><em>, </em><em>optional</em>) – If <code class="docutils literal notranslate"><span class="pre">True</span></code>, the weights will be sampled
+according to a radial distribution, and not a Gaussian one.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>A list of tensors, where each is a sample from the diagonal Gaussian
+distributions defined by entries of <cite>mean</cite> and <cite>std</cite>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="probabilistic.prob_utils.square_wasserstein_2">
+<code class="sig-prename descclassname">probabilistic.prob_utils.</code><code class="sig-name descname">square_wasserstein_2</code><span class="sig-paren">(</span><em class="sig-param">mean_a</em>, <em class="sig-param">logvar_a</em>, <em class="sig-param">mean_b</em>, <em class="sig-param">logvar_b</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/probabilistic/prob_utils.html#square_wasserstein_2"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#probabilistic.prob_utils.square_wasserstein_2" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the square of the Wasserstein-2 distance between 2 diagonal
+Gaussian distributions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mean_a</strong> – Mean tensors of the first distribution (see argument <cite>mean</cite> of
+method <a class="reference internal" href="#probabilistic.prob_utils.sample_diag_gauss" title="probabilistic.prob_utils.sample_diag_gauss"><code class="xref py py-func docutils literal notranslate"><span class="pre">sample_diag_gauss()</span></code></a>).</p></li>
+<li><p><strong>logvar_a</strong> – Log-variance tensors with the same shapes as the <cite>mean_a</cite>
+tensors.</p></li>
+<li><p><strong>mean_b</strong> – Same as <cite>mean_a</cite> for second distribution.</p></li>
+<li><p><strong>logvar_b</strong> – Same as <cite>logvar_a</cite> for second distribution.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The analytically computed square of the Wasserstein distance between
+these distributions.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">regression_uncertainty_mm</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents of this repository:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="gaussian_likelihoods.html">Gaussian Likelihoods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="norm_flow.html">Normalizing Flows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="networks.html">Networks</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Probabilistic</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#module-probabilistic.prob_utils">API</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="datasets.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="utils.html">Utilities</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="networks.html" title="previous chapter">Networks</a></li>
+      <li>Next: <a href="datasets.html" title="next chapter">Datasets</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2021, Maria R. Cervera, Rafael Daetwyler, Hamza Keurti, Francesco dAngelo, Christian Henning.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/probabilistic.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

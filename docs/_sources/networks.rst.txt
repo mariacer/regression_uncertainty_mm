@@ -1,0 +1,31 @@
+.. _networks-reference-label:
+
+Networks
+********
+
+.. contents::
+
+This module contains all relevant functions to generate networks.
+
+API
+===
+
+.. automodule:: networks.gauss_mnet_interface
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+.. automodule:: networks.gauss_mlp
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+.. automodule:: networks.mnet_hnet_wrapper
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+.. automodule:: networks.network_utils
+    :members:
+    :undoc-members:
+    :show-inheritance:

@@ -1,0 +1,525 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>probabilistic.prob_utils &#8212; regression_uncertainty_mm 0.1 documentation</title>
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for probabilistic.prob_utils</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># Copyright 2019 Christian Henning</span>
+<span class="c1">#</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#    http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+<span class="c1">#</span>
+<span class="c1"># @title           :probabilistic/prob_utils.py</span>
+<span class="c1"># @author          :ch, mc</span>
+<span class="c1"># @contact         :henningc@ethz.ch</span>
+<span class="c1"># @created         :08/25/2019</span>
+<span class="c1"># @version         :1.0</span>
+<span class="c1"># @python_version  :3.6.8</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Helper functions when working with Bayesian Neural Networks</span>
+<span class="sd">-----------------------------------------------------------</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">torch.distributions</span> <span class="k">import</span> <span class="n">Normal</span>
+<span class="kn">import</span> <span class="nn">torch.nn.functional</span> <span class="k">as</span> <span class="nn">F</span>
+<span class="kn">from</span> <span class="nn">warnings</span> <span class="k">import</span> <span class="n">warn</span>
+
+<div class="viewcode-block" id="decode_and_sample_diag_gauss"><a class="viewcode-back" href="../../probabilistic.html#probabilistic.prob_utils.decode_and_sample_diag_gauss">[docs]</a><span class="k">def</span> <span class="nf">decode_and_sample_diag_gauss</span><span class="p">(</span><span class="n">mean</span><span class="p">,</span> <span class="n">rho</span><span class="p">,</span> <span class="n">logvar_enc</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">generator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                                 <span class="n">is_radial</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Sample from a Gaussian distribution with diagonal covariance.</span>
+
+<span class="sd">    The covariance of the distribution is given in an encoded form :math:`\rho`.</span>
+<span class="sd">    This method will assume that the standard deviation can be retrieved via</span>
+<span class="sd">    a softplus operation</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        \sigma = \text{softplus} (\rho)</span>
+
+<span class="sd">    Except if it is assumed that :math:`rho` (``rho``) encodes the log-variance</span>
+<span class="sd">    (parameter ``logvar_enc``), in which case the standard deviation is</span>
+<span class="sd">    retrieved via</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        \sigma = \exp (\frac{1}{2} \rho)</span>
+
+<span class="sd">    The samples are drawn according to :math:`\mathcal{N}(\mu, I \sigma^2)`,</span>
+<span class="sd">    except if ``is_radial`` is ``True``, in which case they are sampled</span>
+<span class="sd">    according to</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        \mathbf{w} = \mathbf{\mu} + \mathbf{\sigma} \odot \</span>
+<span class="sd">        \frac{\epsilon_{MFVI}}{\mid\mid \epsilon_{MFVI} \mid\mid} \cdot r</span>
+
+<span class="sd">    where :math:`\epsilon_{MFVI} \sim \mathcal{N} (0, \mathbf{I})`,</span>
+<span class="sd">    :math:`r \sim \mathcal{N} (0, 1)`, and the norm of :math:`\epsilon_{MFVI}`</span>
+<span class="sd">    is computed per parameter tensor (e.g., for the weights or the biases of</span>
+<span class="sd">    each layer). Also :math:`r` is resampled for every parameter tensor.</span>
+
+<span class="sd">    When drawing many samples, it might be more efficient to use a combination</span>
+<span class="sd">    of functions :func:`decode_diag_gauss` and :func:`sample_diag_gauss`.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        mean (list): List of tensors (:class:`torch.Tensor`), that represent</span>
+<span class="sd">            the mean of the Gaussian distribution.</span>
+<span class="sd">        rho (list): List of tensors, that represent the encoded variance</span>
+<span class="sd">            :math:`\rho`.</span>
+<span class="sd">        logvar_enc (bool): Whether the encoded variances ``rho`` represent</span>
+<span class="sd">            log-variances.</span>
+<span class="sd">        generator (torch.Generator, optional): A generator can be passed to</span>
+<span class="sd">            obtain more control over the reproducibility of the random sampling</span>
+<span class="sd">            process.</span>
+<span class="sd">        is_radial (bool, optional): If ``True``, the weights will be sampled</span>
+<span class="sd">            according to a radial distribution, and not a Gaussian one.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        (list): A sample from the desired distribution, retrieved via the</span>
+<span class="sd">        reparametrization trick.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">assert</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">mean</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">rho</span><span class="p">))</span>
+
+    <span class="n">sample</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">device</span> <span class="o">=</span> <span class="n">mean</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">device</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">mean</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">mean</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="n">logvar_enc</span><span class="p">:</span>
+            <span class="n">std</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">rho</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">std</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">softplus</span><span class="p">(</span><span class="n">rho</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+
+        <span class="n">eps</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">std</span><span class="p">),</span> <span class="mf">1.</span><span class="p">,</span> <span class="n">generator</span><span class="o">=</span><span class="n">generator</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_radial</span><span class="p">:</span>
+            <span class="n">sample</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">mean</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="n">eps</span> <span class="o">*</span> <span class="n">std</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">r</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">),</span> <span class="mf">1.</span><span class="p">,</span>
+                             <span class="n">generator</span><span class="o">=</span><span class="n">generator</span><span class="p">)</span>
+            <span class="n">sample</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">mean</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="n">std</span> <span class="o">*</span> <span class="n">r</span> <span class="o">*</span> <span class="n">eps</span> <span class="o">/</span> <span class="n">torch</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">eps</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">sample</span></div>
+
+<div class="viewcode-block" id="decode_diag_gauss"><a class="viewcode-back" href="../../probabilistic.html#probabilistic.prob_utils.decode_diag_gauss">[docs]</a><span class="k">def</span> <span class="nf">decode_diag_gauss</span><span class="p">(</span><span class="n">rho</span><span class="p">,</span> <span class="n">logvar_enc</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">return_var</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                      <span class="n">return_logvar</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Decode the standard deviation for a Gaussian distribution with diagonal</span>
+<span class="sd">    covariance.</span>
+
+<span class="sd">    We consider a Gaussian distribution where the covariance is encoded in</span>
+<span class="sd">    :math:`\rho` (``rho``) as real numbers. We can extract the standard</span>
+<span class="sd">    deviation from :math:`\rho` as described in the documentation of</span>
+<span class="sd">    :func:`decode_and_sample_diag_gauss`.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        (....): See docstring of function :func:`decode_and_sample_diag_gauss`.</span>
+<span class="sd">        return_var (bool, optional): If ``True``, the variance :math:`\sigma^2`</span>
+<span class="sd">            will be returned as well.</span>
+<span class="sd">        return_logvar (bool, optional): If ``True``, the log-variance</span>
+<span class="sd">            :math:`\log\sigma^2` will be returned as well.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        (tuple): Tuple containing:</span>
+
+<span class="sd">        - **std** (list): The standard deviation :math:`\sigma`.</span>
+<span class="sd">        - **var** (list, optional): The variance :math:`\sigma^2`. See argument</span>
+<span class="sd">          ``return_var``.</span>
+<span class="sd">        - **logvar** (list, optional): The log-variance :math:`\log\sigma^2`.</span>
+<span class="sd">          See argument ``return_logvar``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">ret_std</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">ret_var</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">ret_logvar</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">rho</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="n">logvar_enc</span><span class="p">:</span>
+            <span class="n">std</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">rho</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+            <span class="n">logvar</span> <span class="o">=</span> <span class="n">rho</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">std</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">softplus</span><span class="p">(</span><span class="n">rho</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+            <span class="n">logvar</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">std</span><span class="p">)</span>
+
+        <span class="n">ret_std</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">std</span><span class="p">)</span>
+        <span class="n">ret_logvar</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">logvar</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">return_var</span><span class="p">:</span>
+            <span class="n">ret_var</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">std</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">return_var</span> <span class="ow">and</span> <span class="n">return_logvar</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">ret_std</span><span class="p">,</span> <span class="n">ret_var</span><span class="p">,</span> <span class="n">ret_logvar</span>
+    <span class="k">elif</span> <span class="n">return_var</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">ret_std</span><span class="p">,</span> <span class="n">ret_var</span>
+    <span class="k">elif</span> <span class="n">return_logvar</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">ret_std</span><span class="p">,</span> <span class="n">ret_logvar</span>
+
+    <span class="k">return</span> <span class="n">ret_std</span></div>
+
+<div class="viewcode-block" id="sample_diag_gauss"><a class="viewcode-back" href="../../probabilistic.html#probabilistic.prob_utils.sample_diag_gauss">[docs]</a><span class="k">def</span> <span class="nf">sample_diag_gauss</span><span class="p">(</span><span class="n">mean</span><span class="p">,</span> <span class="n">std</span><span class="p">,</span> <span class="n">generator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">is_radial</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Get a sample from a multivariate Gaussian distribution with diagonal</span>
+<span class="sd">    covariance matrix.</span>
+
+<span class="sd">    Samples are produced using the reparametrization trick.</span>
+
+<span class="sd">    Note: </span>
+<span class="sd">        If ``is_radial`` is set to ``True``, samples will instead by obtained</span>
+<span class="sd">        from a radial BNN distribution instead of a multivariate Gaussian.</span>
+<span class="sd">        For details refer to docstring of :func:`decode_and_sample_diag_gauss`.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        mean: A list of tensors. See return value of method</span>
+<span class="sd">            :func:`extract_mean_std`.</span>
+<span class="sd">        std: A list of tensors with the same shapes as `mean`. See return value</span>
+<span class="sd">            of method :func:`extract_mean_std`.</span>
+<span class="sd">        generator (torch.Generator, optional): A generator can be passed to</span>
+<span class="sd">            obtain more control over the reproducibility of the random sampling</span>
+<span class="sd">            process.</span>
+<span class="sd">        is_radial (bool, optional): If ``True``, the weights will be sampled</span>
+<span class="sd">            according to a radial distribution, and not a Gaussian one.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A list of tensors, where each is a sample from the diagonal Gaussian</span>
+<span class="sd">        distributions defined by entries of `mean` and `std`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">sample</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">device</span> <span class="o">=</span> <span class="n">mean</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">device</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">mean</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">m</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">mean</span><span class="p">):</span>
+        <span class="n">eps</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">m</span><span class="p">),</span> <span class="mf">1.</span><span class="p">,</span> <span class="n">generator</span><span class="o">=</span><span class="n">generator</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_radial</span><span class="p">:</span>
+            <span class="n">sample</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">m</span> <span class="o">+</span> <span class="n">eps</span> <span class="o">*</span> <span class="n">std</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">r</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">),</span> <span class="mf">1.</span><span class="p">,</span> \
+                             <span class="n">generator</span><span class="o">=</span><span class="n">generator</span><span class="p">)</span>
+            <span class="n">sample</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">m</span> <span class="o">+</span>  <span class="n">std</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">r</span> <span class="o">*</span> <span class="n">eps</span> <span class="o">/</span> <span class="n">torch</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">eps</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">sample</span></div>
+
+<div class="viewcode-block" id="kl_diag_gaussians"><a class="viewcode-back" href="../../probabilistic.html#probabilistic.prob_utils.kl_diag_gaussians">[docs]</a><span class="k">def</span> <span class="nf">kl_diag_gaussians</span><span class="p">(</span><span class="n">mean_a</span><span class="p">,</span> <span class="n">logvar_a</span><span class="p">,</span> <span class="n">mean_b</span><span class="p">,</span> <span class="n">logvar_b</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Compute the KL divergence between 2 diagonal Gaussian distributions.</span>
+
+<span class="sd">    .. math::</span>
+<span class="sd">        KL \big( p_a(\cdot) \mid\mid  p_b(\cdot) \big)</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        mean_a: Mean tensors of the first distribution (see argument `mean` of</span>
+<span class="sd">            method :func:`sample_diag_gauss`).</span>
+<span class="sd">        logvar_a: Log-variance tensors with the same shapes as the `mean_a`</span>
+<span class="sd">            tensors.</span>
+<span class="sd">        mean_b: Same as `mean_a` for second distribution.</span>
+<span class="sd">        logvar_b: Same as `logvar_a` for second distribution.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The analytically computed KL divergence between these distributions.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">mean_a_flat</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">mean_a</span><span class="p">])</span>
+    <span class="n">logvar_a_flat</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">logvar_a</span><span class="p">])</span>
+    <span class="n">mean_b_flat</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">mean_b</span><span class="p">])</span>
+    <span class="n">logvar_b_flat</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">logvar_b</span><span class="p">])</span>
+
+    <span class="c1">### Using our own implementation ###</span>
+    <span class="n">kl</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span> <span class="o">+</span> \
+        <span class="p">(</span><span class="n">logvar_a_flat</span><span class="o">.</span><span class="n">exp</span><span class="p">()</span> <span class="o">+</span> <span class="p">(</span><span class="n">mean_b_flat</span> <span class="o">-</span> <span class="n">mean_a_flat</span><span class="p">)</span><span class="o">.</span><span class="n">pow</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span> <span class="o">/</span> \
+        <span class="n">logvar_b_flat</span><span class="o">.</span><span class="n">exp</span><span class="p">()</span> <span class="o">+</span> <span class="n">logvar_b_flat</span> <span class="o">-</span> <span class="n">logvar_a_flat</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">kl</span></div>
+
+<div class="viewcode-block" id="kl_diag_gauss_with_standard_gauss"><a class="viewcode-back" href="../../probabilistic.html#probabilistic.prob_utils.kl_diag_gauss_with_standard_gauss">[docs]</a><span class="k">def</span> <span class="nf">kl_diag_gauss_with_standard_gauss</span><span class="p">(</span><span class="n">mean</span><span class="p">,</span> <span class="n">logvar</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Compute the KL divergence between an arbitrary diagonal Gaussian</span>
+<span class="sd">    distributions and a Gaussian with zero mean and unit variance.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        mean: Mean tensors of the distribution (see argument `mean` of</span>
+<span class="sd">            method :func:`sample_diag_gauss`).</span>
+<span class="sd">        logvar: Log-variance tensors with the same shapes as the `mean`</span>
+<span class="sd">            tensors.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The analytically computed KL divergence between these distributions.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">mean_flat</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">mean</span><span class="p">])</span>
+    <span class="n">logvar_flat</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">logvar</span><span class="p">])</span>
+    <span class="n">var_flat</span> <span class="o">=</span> <span class="n">logvar_flat</span><span class="o">.</span><span class="n">exp</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="o">-</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">logvar_flat</span> <span class="o">-</span> <span class="n">mean_flat</span><span class="o">.</span><span class="n">pow</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="o">-</span> <span class="n">var_flat</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="square_wasserstein_2"><a class="viewcode-back" href="../../probabilistic.html#probabilistic.prob_utils.square_wasserstein_2">[docs]</a><span class="k">def</span> <span class="nf">square_wasserstein_2</span><span class="p">(</span><span class="n">mean_a</span><span class="p">,</span> <span class="n">logvar_a</span><span class="p">,</span> <span class="n">mean_b</span><span class="p">,</span> <span class="n">logvar_b</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Compute the square of the Wasserstein-2 distance between 2 diagonal </span>
+<span class="sd">    Gaussian distributions.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        mean_a: Mean tensors of the first distribution (see argument `mean` of</span>
+<span class="sd">            method :func:`sample_diag_gauss`).</span>
+<span class="sd">        logvar_a: Log-variance tensors with the same shapes as the `mean_a`</span>
+<span class="sd">            tensors.</span>
+<span class="sd">        mean_b: Same as `mean_a` for second distribution.</span>
+<span class="sd">        logvar_b: Same as `logvar_a` for second distribution.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The analytically computed square of the Wasserstein distance between </span>
+<span class="sd">        these distributions.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">mean_a_flat</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">mean_a</span><span class="p">])</span>
+    <span class="n">var_a_flat</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">logvar_a</span><span class="p">])</span><span class="o">.</span><span class="n">exp</span><span class="p">()</span>
+    <span class="n">mean_b_flat</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">mean_b</span><span class="p">])</span>
+    <span class="n">var_b_flat</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">logvar_b</span><span class="p">])</span><span class="o">.</span><span class="n">exp</span><span class="p">()</span>
+
+    <span class="n">square_wasserstein</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">norm</span><span class="p">((</span><span class="n">mean_a_flat</span> <span class="o">-</span> <span class="n">mean_b_flat</span><span class="p">),</span> <span class="n">p</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> \
+        <span class="p">(</span><span class="n">var_a_flat</span> <span class="o">+</span> <span class="n">var_b_flat</span> <span class="o">-</span> <span class="mi">2</span><span class="o">*</span><span class="n">torch</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">var_a_flat</span><span class="o">*</span><span class="n">var_b_flat</span><span class="p">))</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">square_wasserstein</span></div>
+
+<div class="viewcode-block" id="kl_radial_bnn_with_diag_gauss"><a class="viewcode-back" href="../../probabilistic.html#probabilistic.prob_utils.kl_radial_bnn_with_diag_gauss">[docs]</a><span class="k">def</span> <span class="nf">kl_radial_bnn_with_diag_gauss</span><span class="p">(</span><span class="n">mean_a</span><span class="p">,</span> <span class="n">std_a</span><span class="p">,</span> <span class="n">mean_b</span><span class="p">,</span> <span class="n">std_b</span><span class="p">,</span>
+                                  <span class="n">ce_sample_size</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">generator</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Compute the KL divergence between one radial BNN distribution and one</span>
+<span class="sd">    diagonal Gaussian distribution.</span>
+
+<span class="sd">    For a radial BNN distribution :math:`p_a(\cdot)` and a Gaussian distribution</span>
+<span class="sd">    :math:`p_b(\cdot)`, the expression is given by</span>
+
+<span class="sd">    .. math::</span>
+<span class="sd">        KL \big( p_a(\cdot) \mid\mid  p_b(\cdot) \big) = \</span>
+<span class="sd">        \int p_a(\cdot) \log{p_a(\cdot)} \,d\cdot - \</span>
+<span class="sd">        \int p_a(\cdot) \log{p_b(\cdot)} \,d\cdot = \</span>
+<span class="sd">        - h(p_a(\cdot)) + h(p_a(\cdot), p_b(\cdot))</span>
+
+<span class="sd">    where :math:`h(p_a(\cdot))` denotes the entropy of :math:`p_a(\cdot)` and </span>
+<span class="sd">    :math:`h(p_a(\cdot), p_b(\cdot))` the cross-entropy between </span>
+<span class="sd">    :math:`p_a(\cdot)` and :math:`p_b(\cdot)`.</span>
+
+<span class="sd">    **Entropy**</span>
+
+<span class="sd">    Since :math:`p_a(\cdot)` is a radial BNN distribution its entropy can be </span>
+<span class="sd">    computed analytically according to</span>
+
+<span class="sd">    .. math::</span>
+<span class="sd">        h(p_a(\cdot)) = \sum_{i} \log [\sigma^{a}_i] + const</span>
+
+<span class="sd">    as described in Eq.5 from</span>
+<span class="sd">    `Farquhar et al. &lt;https://arxiv.org/abs/1907.00865&gt;`__, where :math:`i` is</span>
+<span class="sd">    a sum over the weights.</span>
+
+<span class="sd">    **Cross-entropy**</span>
+
+<span class="sd">    The cross-entropy term can be estimated taking :math:`N` Monte-Carlo samples </span>
+<span class="sd">    from :math:`p_a(\cdot)` and averaging their log-probability under </span>
+<span class="sd">    :math:`p_b(\cdot)`.</span>
+
+<span class="sd">    .. math::</span>
+<span class="sd">        h(p_a(\cdot), p_b(\cdot)) \approx \</span>
+<span class="sd">            - \frac{1}{N} \sum_{n}^{N} \log[p_b(\cdot^{(n)})]</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        mean_a: Mean tensors of the radial BNN distribution (see argument `mean` </span>
+<span class="sd">            of method :func:`sample_diag_gauss`).</span>
+<span class="sd">        std_a: The standard deviation :math:`\sigma` with the same shapes as the </span>
+<span class="sd">            `mean_a` tensors.</span>
+<span class="sd">        mean_b: Same as `mean_a` for diagonal Gaussian distribution.</span>
+<span class="sd">        std_b: Same as `std_a` for diagonal Gaussian distribution.</span>
+<span class="sd">        ce_sample_size (int, optional): The number of weight samples to draw to</span>
+<span class="sd">            estimate the cross-entropy term of the KL.</span>
+<span class="sd">        generator (torch.Generator, optional): A generator can be passed to</span>
+<span class="sd">            obtain more control over the reproducibility of the random sampling</span>
+<span class="sd">            process.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The computed KL divergence between these distributions.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1">### Analytically compute entropy term.</span>
+    <span class="c1"># Since we sum the log values of the standard deviation, we can simply</span>
+    <span class="c1"># flatten the parameter tensors and compute the log and sum on this vector.</span>
+    <span class="n">entropy</span> <span class="o">=</span> <span class="o">-</span> <span class="n">torch</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">t</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">std_a</span><span class="p">]))</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+    <span class="c1">### Estimate cross-entropy term.</span>
+    <span class="n">cross_entropy</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ce_sample_size</span><span class="p">):</span>
+        <span class="c1"># Take a weight sample from :math:`p_a(w)`.</span>
+        <span class="n">sample</span> <span class="o">=</span> <span class="n">sample_diag_gauss</span><span class="p">(</span><span class="n">mean_a</span><span class="p">,</span> <span class="n">std_a</span><span class="p">,</span> <span class="n">generator</span><span class="o">=</span><span class="n">generator</span><span class="p">,</span>
+                                   <span class="n">is_radial</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">mean_b</span><span class="p">)):</span>
+            <span class="c1"># Define the normal distribution for the prior.</span>
+            <span class="n">p_b</span> <span class="o">=</span> <span class="n">Normal</span><span class="p">(</span><span class="n">mean_b</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">std_b</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+            <span class="c1"># Note, all weights are independent from one another (no</span>
+            <span class="c1"># correlations) modelled in our weight distributions. Thus, we can</span>
+            <span class="c1"># just sum all log-probs within and across parameter tensors.</span>
+            <span class="n">cross_entropy</span> <span class="o">+=</span> <span class="n">p_b</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">sample</span><span class="p">[</span><span class="n">i</span><span class="p">])</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+    <span class="n">cross_entropy</span> <span class="o">/=</span> <span class="n">ce_sample_size</span>
+
+    <span class="k">return</span> <span class="n">entropy</span> <span class="o">-</span> <span class="n">cross_entropy</span></div>
+
+<div class="viewcode-block" id="sample_diag_gaus_from_hnet"><a class="viewcode-back" href="../../probabilistic.html#probabilistic.prob_utils.sample_diag_gaus_from_hnet">[docs]</a><span class="k">def</span> <span class="nf">sample_diag_gaus_from_hnet</span><span class="p">(</span><span class="n">hnet_outputs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;This method uses the reparametrization trick to sample a set of main</span>
+<span class="sd">    network weights assuming the output of the hypernetwork represents the</span>
+<span class="sd">    mean and log-variances of a diagonal Gaussian distribution.</span>
+
+<span class="sd">    When drawing many samples, it might be more efficient to use a combination</span>
+<span class="sd">    of methods :func:`extract_mean_std` and :func:`sample_diag_gauss`.</span>
+
+<span class="sd">    .. deprecated:: 1.0</span>
+<span class="sd">        Please use a main network wrapper such as</span>
+<span class="sd">        :class:`probabilistic.gauss_mnet_interface.GaussianBNNWrapper` or the</span>
+<span class="sd">        function :func:`decode_and_sample_diag_gauss` rather than working with</span>
+<span class="sd">        the hypernet output directly.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        hnet_outputs: A list of tensors. The first half of this list is</span>
+<span class="sd">            interpreted as mean values and the second half as log variance</span>
+<span class="sd">            values.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A sample of the distribution represented by the hypernet output.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">warn</span><span class="p">(</span><span class="s1">&#39;Please use a main network wrapper such as class&#39;</span> <span class="o">+</span>
+        <span class="s1">&#39;&quot;probabilistic.gauss_mnet_interface.GaussianBNNWrapper&quot; or the&#39;</span> <span class="o">+</span>
+        <span class="s1">&#39;function &quot;decode_and_sample_diag_gauss&quot; rather than working with &#39;</span> <span class="o">+</span>
+        <span class="s1">&#39;the hypernet output directly.&#39;</span><span class="p">,</span> <span class="ne">DeprecationWarning</span><span class="p">)</span>
+
+    <span class="k">assert</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">hnet_outputs</span><span class="p">)</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">hnet_outputs</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span>
+
+    <span class="n">mu</span> <span class="o">=</span> <span class="n">hnet_outputs</span><span class="p">[</span><span class="n">n</span><span class="p">:]</span>
+    <span class="n">logvar</span> <span class="o">=</span> <span class="n">hnet_outputs</span><span class="p">[:</span><span class="n">n</span><span class="p">]</span>
+
+    <span class="n">sample</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+        <span class="n">std</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">logvar</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+        <span class="n">sample</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Normal</span><span class="p">(</span><span class="n">mu</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">std</span><span class="p">)</span><span class="o">.</span><span class="n">rsample</span><span class="p">())</span>
+
+    <span class="k">return</span> <span class="n">sample</span></div>
+
+<div class="viewcode-block" id="extract_mean_std"><a class="viewcode-back" href="../../probabilistic.html#probabilistic.prob_utils.extract_mean_std">[docs]</a><span class="k">def</span> <span class="nf">extract_mean_std</span><span class="p">(</span><span class="n">hnet_outputs</span><span class="p">,</span> <span class="n">return_logvar</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Extract mean and standard deviation for a multivariate Gaussian</span>
+<span class="sd">    distribution with diagonal covaiance matrix from a hypernetwork that outputs</span>
+<span class="sd">    mean and log-variance.</span>
+
+<span class="sd">    .. deprecated:: 1.0</span>
+<span class="sd">        Please use a main network wrapper such as</span>
+<span class="sd">        :class:`probabilistic.gauss_mnet_interface.GaussianBNNWrapper` or the</span>
+<span class="sd">        function :func:`decode_diag_gauss` rather than working with</span>
+<span class="sd">        the hypernet output directly.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        hnet_outputs: See docstring of method :func:`sample_diag_gaus_weights`.</span>
+<span class="sd">        return_logvar (optional): If set, a third value will be returned,</span>
+<span class="sd">            corresponding to the log-variance.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Two lists of tensors: `mean` and `std`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">warn</span><span class="p">(</span><span class="s1">&#39;Please use a main network wrapper such as class&#39;</span> <span class="o">+</span>
+        <span class="s1">&#39;&quot;probabilistic.gauss_mnet_interface.GaussianBNNWrapper&quot; or the&#39;</span> <span class="o">+</span>
+        <span class="s1">&#39;function &quot;decode_diag_gauss&quot; rather than working with &#39;</span> <span class="o">+</span>
+        <span class="s1">&#39;the hypernet output directly.&#39;</span><span class="p">,</span> <span class="ne">DeprecationWarning</span><span class="p">)</span>
+
+    <span class="k">assert</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">hnet_outputs</span><span class="p">)</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">hnet_outputs</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span>
+
+    <span class="n">mean</span> <span class="o">=</span> <span class="n">hnet_outputs</span><span class="p">[</span><span class="n">n</span><span class="p">:]</span>
+    <span class="n">logvar</span> <span class="o">=</span> <span class="n">hnet_outputs</span><span class="p">[:</span><span class="n">n</span><span class="p">]</span>
+    <span class="n">std</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">logvar</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">)]</span>
+
+    <span class="k">if</span> <span class="n">return_logvar</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">mean</span><span class="p">,</span> <span class="n">std</span><span class="p">,</span> <span class="n">logvar</span>
+    <span class="k">return</span> <span class="n">mean</span><span class="p">,</span> <span class="n">std</span></div>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="k">pass</span>
+
+
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">regression_uncertainty_mm</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents of this repository:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../gaussian_likelihoods.html">Gaussian Likelihoods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../norm_flow.html">Normalizing Flows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../networks.html">Networks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic.html">Probabilistic</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../datasets.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../utils.html">Utilities</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2021, Maria R. Cervera, Rafael Daetwyler, Hamza Keurti, Francesco dAngelo, Christian Henning.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,16 @@
+.. _probabilistic-reference-label:
+
+Probabilistic
+*************
+
+.. contents::
+
+This module contains all relevant functions to generate probabilistic extensions of the models.
+
+API
+===
+
+.. automodule:: probabilistic.prob_utils
+    :members:
+    :undoc-members:
+    :show-inheritance:

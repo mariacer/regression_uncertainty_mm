@@ -1,0 +1,467 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>gaussian_likelihoods.train_utils &#8212; regression_uncertainty_mm 0.1 documentation</title>
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for gaussian_likelihoods.train_utils</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># Copyright 2021 Maria Cervera</span>
+<span class="c1">#</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#    http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+<span class="c1">#</span>
+<span class="c1"># @title          :gaussian_likelihoods/train_utils.py</span>
+<span class="c1"># @author         :mc</span>
+<span class="c1"># @contact        :mariacer@ethz.ch</span>
+<span class="c1"># @created        :20/08/2021</span>
+<span class="c1"># @version        :1.0</span>
+<span class="c1"># @python_version :3.7.4</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Helper functions for training</span>
+<span class="sd">-----------------------------</span>
+
+<span class="sd">A collection of helper functions for training to keep other scripts clean.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">torch.distributions.normal</span> <span class="k">import</span> <span class="n">Normal</span>
+<span class="kn">import</span> <span class="nn">torch.nn.functional</span> <span class="k">as</span> <span class="nn">F</span>
+
+<div class="viewcode-block" id="compute_nll"><a class="viewcode-back" href="../../gaussian_likelihoods.html#gaussian_likelihoods.train_utils.compute_nll">[docs]</a><span class="k">def</span> <span class="nf">compute_nll</span><span class="p">(</span><span class="n">T</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ndims</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Compute the negative log-likehood of a Gaussian.</span>
+
+<span class="sd">    It computes the following quantity:</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        - \log q(y | x, w) &amp;=  - \log \mathcal{N} (\mu, \sigma^2) \\</span>
+<span class="sd">            &amp;= - \log \Big[ \frac{1}{\sqrt{2 \pi} \sigma} exp \big( - \</span>
+<span class="sd">            \frac{(y - \mu)^2}{2 \sigma^2}\big) \Big] \\</span>
+<span class="sd">            &amp;= \frac{1}{2} \log (2 \pi) + \log \sigma + \</span>
+<span class="sd">            \frac{(y - \mu)^2}{2 \sigma^2}</span>
+
+<span class="sd">    Assuming i.i.d. data, :math:`q(y | x, w)` is a product of the probabilities</span>
+<span class="sd">    of individual samples, which corresponds to a sum in log scale.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        T: The target tensor. It has shape ``[batch_size, 1]``</span>
+<span class="sd">            since the loss is comupted separately for each weight sample.</span>
+<span class="sd">        Y: Output tensor consisting of means. Same shape as ``T`` for cases</span>
+<span class="sd">            with homoscedastic variance, else it will have a second column with</span>
+<span class="sd">            the variances.</span>
+<span class="sd">        sigma (float, optional): The standard deviation of the predictive</span>
+<span class="sd">            distribution. Only provided for Gaussian models with homoscedastic</span>
+<span class="sd">            variance.</span>
+<span class="sd">        ndims (int): Dimensionality of the output space.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        (float): The negative log-likelihood.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">ndims</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="n">sigma</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">Y</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">2</span>
+        <span class="n">homoscedastic</span> <span class="o">=</span> <span class="n">Y</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">T</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">T</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span>
+            <span class="n">T</span> <span class="o">=</span> <span class="n">T</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()</span>
+
+        <span class="c1"># Extract mean and variance.</span>
+        <span class="n">mu</span> <span class="o">=</span> <span class="n">Y</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">mu</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">mu</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span>
+            <span class="n">mu</span> <span class="o">=</span> <span class="n">mu</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">homoscedastic</span><span class="p">:</span>
+            <span class="n">rho</span> <span class="o">=</span> <span class="n">Y</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span>  
+            <span class="n">sigma</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="mi">2</span> <span class="o">*</span> <span class="n">rho</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">sigma</span> <span class="o">=</span> <span class="n">sigma</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">mu</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">Y</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sigma</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">sigma</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span>
+            <span class="n">sigma</span> <span class="o">=</span> <span class="n">sigma</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()</span>
+
+        <span class="k">assert</span> <span class="n">mu</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">T</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">sigma</span><span class="o">.</span><span class="n">shape</span>
+        <span class="n">nll</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">sigma</span><span class="p">)</span> <span class="o">+</span> \
+            <span class="mf">0.5</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">square</span><span class="p">((</span><span class="n">mu</span> <span class="o">-</span> <span class="n">T</span><span class="p">)</span><span class="o">/</span><span class="n">sigma</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">nll</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+    <span class="k">elif</span> <span class="n">ndims</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="n">sigma</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">Y</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">5</span>
+        <span class="n">homoscedastic</span> <span class="o">=</span> <span class="n">Y</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">2</span>
+        <span class="n">mu</span> <span class="o">=</span> <span class="n">Y</span><span class="p">[:,:</span><span class="mi">2</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">homoscedastic</span><span class="p">:</span>
+            <span class="n">var</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">Y</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">:</span><span class="mi">4</span><span class="p">])</span>
+            <span class="n">rho</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tanh</span><span class="p">(</span><span class="n">Y</span><span class="p">[:,</span> <span class="mi">4</span><span class="p">])</span> <span class="c1"># correlation factor</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># We assume a circular gaussian </span>
+            <span class="c1"># of radius the config argument --pred_dist_std.</span>
+            <span class="n">var</span> <span class="o">=</span> <span class="p">(</span><span class="n">sigma</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">mu</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="mi">2</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">Y</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+            <span class="n">rho</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">mu</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+            <span class="c1"># rho = torch.ones((mu.shape[0])) * 0.13</span>
+
+
+        <span class="n">T_c</span> <span class="o">=</span> <span class="n">T</span> <span class="o">-</span> <span class="n">mu</span>
+        <span class="n">det</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">rho</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span><span class="o">*</span><span class="n">var</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">var</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">nll</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">det</span><span class="p">)</span> <span class="o">+</span> \
+            <span class="mf">0.5</span><span class="o">/</span> <span class="n">det</span> <span class="o">*</span> <span class="p">(</span><span class="n">var</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">T_c</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="n">var</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="p">(</span><span class="n">T_c</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> \
+                <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">rho</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">var</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">var</span><span class="p">[:,</span><span class="mi">1</span><span class="p">])</span> <span class="o">*</span> <span class="n">T_c</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">T_c</span><span class="p">[:,</span><span class="mi">1</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">nll</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="compute_mse"><a class="viewcode-back" href="../../gaussian_likelihoods.html#gaussian_likelihoods.train_utils.compute_mse">[docs]</a><span class="k">def</span> <span class="nf">compute_mse</span><span class="p">(</span><span class="n">T</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">ndims</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns the MSE between predictions and targets.</span>
+
+<span class="sd">    This function deals with a single model, and the sum for the MC estimate is</span>
+<span class="sd">    therefore done outside this function.</span>
+
+<span class="sd">    This function should be used as loss function for models with homoscedastic</span>
+<span class="sd">    Gaussian likelihood, as it does not allow to learn the variances.</span>
+
+<span class="sd">    This function simply computes:</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        \frac{1}{n}\sum_{i=1}^n (y_i-\mu(x_i))^2</span>
+
+<span class="sd">    It can be derived from the loss expression found in :func:`compute_loss`.</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        L(y, \mu(x), \sigma(x)) = \frac{1}{n}\sum_{i=1}^n\left(\log \</span>
+<span class="sd">            (\sigma(x_i)) + \frac{1}{2}\left(\frac{y_i-\mu(x_i)}{\</span>
+<span class="sd">            \sigma(x_i)}\right)^2 \right)</span>
+
+<span class="sd">    Since the variances are not learned in this setting, </span>
+<span class="sd">    :math:`\sigma(x_i) = \sigma`, and the term :math:`\log (\sigma(x_i))` is</span>
+<span class="sd">    constant w.r.t. the learnable parameters and can be dropped.</span>
+<span class="sd">    We therefore obtain:</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        L(y, \mu(x), \sigma(x)) = \frac{1}{n}\sum_{i=1}^n\left(\frac{1}{2} \</span>
+<span class="sd">            \left(\frac{y_i-\mu(x_i)}{\sigma}\right)^2 \right)</span>
+
+<span class="sd">    which is simply the MSE scaled by :math:`2 \sigma^2`, where :math:`\sigma`</span>
+<span class="sd">    corresponds to our parameter ``config.pred_dist_std``.</span>
+
+<span class="sd">    Note that it can also be derived from the KL between two gaussians:</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        \mathbb{E}_{p(x)}[D_{KL}(p(y \mid x) \mid\mid q(y \mid x,w))] = \</span>
+<span class="sd">            \mathbb{E}_{p(x)}[\log(\frac{\sigma}{\sigma_p})+ \</span>
+<span class="sd">            \frac{\sigma_p^2 + (\mu_p(x) - \mu(x))^2}{2 \sigma^2} - \frac{1}{2}]</span>
+
+<span class="sd">    where :math:`p(y \mid x)` is the groundtruth, :math:`q(y \mid x, w)`</span>
+<span class="sd">    is the predictive distribution, and :math:`\mu_p(x)` and :math:`\sigma_p`</span>
+<span class="sd">    are the input-dependent means and the fixed standard deviation of the</span>
+<span class="sd">    groundtruth. Again, since only the means are learned we can drop constant</span>
+<span class="sd">    terms and obtain the same expression as above.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        T: The target tensor. It has shape ``[batch_size, 1]``</span>
+<span class="sd">            since the loss is comupted separately for each weight sample.</span>
+<span class="sd">        Y: Output tensor consisting of means. Same shape as ``T``.</span>
+<span class="sd">        ndims (int): Dimensionality of the output space.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        (float): The MSE.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">ndims</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">Y</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">Y</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span>
+            <span class="n">Y</span> <span class="o">=</span> <span class="n">Y</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">T</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">T</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span>
+            <span class="n">T</span> <span class="o">=</span> <span class="n">T</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()</span>
+        <span class="k">assert</span> <span class="n">Y</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">T</span><span class="o">.</span><span class="n">shape</span>
+        <span class="n">kl</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">square</span><span class="p">(</span><span class="n">Y</span> <span class="o">-</span> <span class="n">T</span><span class="p">)</span>
+
+    <span class="k">elif</span> <span class="n">ndims</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>   
+        <span class="k">assert</span> <span class="n">Y</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">T</span><span class="o">.</span><span class="n">shape</span>     
+        <span class="n">kl</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">square</span><span class="p">(</span><span class="n">Y</span> <span class="o">-</span> <span class="n">T</span><span class="p">)</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()</span>
+        <span class="c1"># Sum over vector units if multidimensional before reduce.</span>
+        <span class="n">kl</span> <span class="o">=</span> <span class="n">kl</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">kl</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span></div>
+    
+<div class="viewcode-block" id="compute_cross_entropy"><a class="viewcode-back" href="../../gaussian_likelihoods.html#gaussian_likelihoods.train_utils.compute_cross_entropy">[docs]</a><span class="k">def</span> <span class="nf">compute_cross_entropy</span><span class="p">(</span><span class="n">T</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">reduction</span><span class="o">=</span><span class="s1">&#39;mean&#39;</span><span class="p">,</span><span class="n">ndims</span> <span class="o">=</span> <span class="mi">1</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns the regression cross entropy loss.</span>
+
+<span class="sd">    This function deals with a single model, and the sum for the MC estimate is</span>
+<span class="sd">    therefore done outside this function.</span>
+
+<span class="sd">    This function should be used as loss function for models with</span>
+<span class="sd">    heteroscedastic Gaussian likelihood, as it allows to learn the variances.</span>
+<span class="sd">    This function is derived by minimizing the KL divergence between ground</span>
+<span class="sd">    truth and Gaussian model likelihood (for a derivation see dosctring of</span>
+<span class="sd">    function :func:`compute_loss`). It computes the following loss:</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        L(y, \mu(x), \sigma(x)) = \frac{1}{n}\sum_{i=1}^n\left(\log \</span>
+<span class="sd">            (\sigma(x_i)) + \frac{1}{2}\left(\frac{y_i-\mu(x_i)}{\</span>
+<span class="sd">            \sigma(x_i)}\right)^2 \right)</span>
+
+<span class="sd">    Note that it can also be derived from the KL between two gaussians:</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        \mathbb{E}_{p(x)}[D_{KL}(p(y|x) \parallel q(y|x,w))] &amp;= \</span>
+<span class="sd">            \mathbb{E}_{p(x)} \big[\log(\frac{\sigma(x)}{\sigma_p(x)}) + \</span>
+<span class="sd">            \frac{\sigma_p(x)^2 + (\mu_p(x) - \mu(x))^2}{2 \sigma(x)^2} \</span>
+<span class="sd">            - \frac{1}{2} \big] \\</span>
+<span class="sd">            &amp;= \mathbb{E}_{p(x)} \big[\log(\frac{\sigma(x)}{\sigma_p(x)}) + \</span>
+<span class="sd">            \frac{\sigma_p(x)^2 + \mu_p(x)^2 - 2\mu_p(x)\mu(x)+ \mu(x)^2}{2 \</span>
+<span class="sd">            \sigma(x)^2} - \frac{1}{2} \big]</span>
+
+<span class="sd">    where :math:`p(y \mid x)` is the groundtruth, :math:`q(y \mid x, w)`</span>
+<span class="sd">    is the predictive distribution, and :math:`\mu_p(x)` and :math:`\sigma_p(x)`</span>
+<span class="sd">    are the input-dependent means and standard deviations of the groundtruth.</span>
+<span class="sd">    Now for machine learning applications we assume we can&#39;t have</span>
+<span class="sd">    access to the groundtruth, so we don&#39;t have access to :math:`\mu_p(x)`,</span>
+<span class="sd">    instead we have access to observations </span>
+<span class="sd">    :math:`y(x) = \mu_p(x) + \epsilon \sigma_p(x)` where</span>
+<span class="sd">    :math:`\epsilon \sim \mathcal{N}(0, 1)`.</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        \mathbb{E}_{p(x)}[D_{KL}(p(y|x) \parallel q(y|x,w))] &amp;= \</span>
+<span class="sd">            \mathbb{E}_{p(x)} \big[\log(\frac{\sigma(x)}{\sigma_p(x)}) + \</span>
+<span class="sd">            \frac{\mathbb{E}_{p(y|x)}[y^2] - 2\mathbb{E}_{p(y|x)}[y] \mu(x)+ \</span>
+<span class="sd">            \mu(x)^2}{2 \sigma(x)^2} - \frac{1}{2} \big] \\</span>
+<span class="sd">            &amp;= \mathbb{E}_{p(x)} \big[\log(\frac{\sigma(x)}{\sigma_p(x)}) + \</span>
+<span class="sd">            \frac{\mathbb{E}_{p(y|x)}[y^2 - 2 y \mu(x)+ \</span>
+<span class="sd">            \mu(x)^2]}{2 \sigma(x)^2} - \frac{1}{2} \big] \\</span>
+<span class="sd">            &amp;= \mathbb{E}_{p(x, y)} \big[\log(\frac{\sigma(x)}{\sigma_p(x)}) + \</span>
+<span class="sd">            \frac{(y - \mu(x))^2}{2 \sigma(x)^2} - \frac{1}{2} \big] \\</span>
+
+<span class="sd">    where we have used that :math:`\mathbb{E}_{p(y|x)}[y] = \mu_p(x)` and</span>
+<span class="sd">    :math:`\mathbb{E}_{p(y|x)}[y^2] = var(y) + \mathbb{E}_{p(y|x)}[y]^2` so</span>
+<span class="sd">    :math:`\mathbb{E}_{p(y|x)}[y^2] = \sigma_p(x)^2 + \mu_p(x)^2`. Recall</span>
+<span class="sd">    that :math:`\sigma_p(x)` is unknown, and drops from the optimization, so</span>
+<span class="sd">    we recover the expression above when doing an MC estimate.</span>
+
+<span class="sd">    In practice, since entorpy-related terms drop, for optimization we only care</span>
+<span class="sd">    about the negative log-likelihood term up to some constants.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        (....): See docstring of function :func:`compute_mse`.</span>
+<span class="sd">        ndims: Whether regression output is 1D or 2D.</span>
+<span class="sd">        sigma (float, optional): The standard deviation of the predictive</span>
+<span class="sd">            distribution. Only provided for Gaussian models with homoscedastic</span>
+<span class="sd">            variance.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The cross-entropy.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">ce</span> <span class="o">=</span> <span class="n">compute_nll</span><span class="p">(</span><span class="n">T</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="n">sigma</span><span class="p">,</span> <span class="n">ndims</span><span class="o">=</span><span class="n">ndims</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">reduction</span> <span class="o">==</span> <span class="s1">&#39;mean&#39;</span><span class="p">:</span>
+        <span class="n">ce</span> <span class="o">/=</span> <span class="n">T</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    
+    <span class="k">return</span> <span class="n">ce</span></div>
+
+<div class="viewcode-block" id="compute_entropy_gaussian"><a class="viewcode-back" href="../../gaussian_likelihoods.html#gaussian_likelihoods.train_utils.compute_entropy_gaussian">[docs]</a><span class="k">def</span> <span class="nf">compute_entropy_gaussian</span><span class="p">(</span><span class="n">mnet</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">x_torch</span><span class="p">,</span> <span class="n">num_samples</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+                             <span class="n">num_models</span><span class="o">=</span><span class="mi">100</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Compute the entropy of a Gaussian posterior predictive distribution.</span>
+
+<span class="sd">    We consider a Bayesian setting with a posterior predictive distribution:</span>
+
+<span class="sd">    .. math :: </span>
+
+<span class="sd">        p(y|D,x) &amp;= \int_w p(y|w,x)p(w |D) dw \\</span>
+<span class="sd">            &amp;\approx \frac{1}{K}\sum_{k=1}^K p(y|w_k,x)</span>
+
+<span class="sd">    The differential entropy of this posterior predictive is given by:</span>
+
+<span class="sd">    .. math :: </span>
+
+<span class="sd">        h\big[p(y|D,x)\big] &amp;= -\int_{\mathcal{Y}} p(y|D,x) \log \</span>
+<span class="sd">            p(y|D,x) dy \\</span>
+
+<span class="sd">    If we can draw samples from the posterior and both sample from and</span>
+<span class="sd">    evaluate the likelihood :math:`p(y|w,x)`, we can estimate the differential</span>
+<span class="sd">    entropy of the posterior predictive using a double Monte Carlo estimate as</span>
+<span class="sd">    follows:</span>
+
+<span class="sd">    .. math :: </span>
+
+<span class="sd">        h\big[p(y|D,x)\big] \approx - \frac{1}{N} \sum_{i=1}^N \log \</span>
+<span class="sd">            \Big( \frac{1}{K}\sum_{k=1}^K p(y_i|w_k,x) \Big)</span>
+
+<span class="sd">    where :math:`\{y_i\}_{i=1}^N` is a Monte Carlo sample from the posterior</span>
+<span class="sd">    predictive (not from a specific model). A sample :math:`y` can be drawn from</span>
+<span class="sd">    the posterior predictive as follows:</span>
+
+<span class="sd">    .. math ::</span>
+<span class="sd">        &amp;\hat{w} \sim p(w|D)\text{, and then}\\</span>
+<span class="sd">        &amp;y \sim p(y|\hat{w},x)</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        mnet: The main network.</span>
+<span class="sd">        config: The configuration.</span>
+<span class="sd">        x_torch (torch.Tensor): The inputs.</span>
+<span class="sd">        num_samples (int): The number of samples to use for each input.</span>
+<span class="sd">        num_models (int): The number of models to sample for Bayesian networks.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        (np.array): The averaged entropy across weight samples for the entire</span>
+<span class="sd">            input range.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Extract Bayesian model parameters.</span>
+    <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">mean_only</span><span class="p">:</span>
+        <span class="n">w_mean</span> <span class="o">=</span> <span class="n">mnet</span><span class="o">.</span><span class="n">weights</span>
+        <span class="n">w_std</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">w_mean</span><span class="p">,</span> <span class="n">w_rho</span> <span class="o">=</span> <span class="n">mnet</span><span class="o">.</span><span class="n">extract_mean_and_rho</span><span class="p">(</span><span class="n">weights</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+
+    <span class="c1">### First, sample y&#39;s from the posterior predictive distribution.</span>
+    <span class="n">predictions</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_samples</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">mean_only</span><span class="p">:</span>
+            <span class="n">predictions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">mnet</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">x_torch</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="n">w_mean</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">predictions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">mnet</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">x_torch</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                           <span class="n">mean_only</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">extracted_mean</span><span class="o">=</span><span class="n">w_mean</span><span class="p">,</span>
+                           <span class="n">extracted_rho</span><span class="o">=</span><span class="n">w_rho</span><span class="p">))</span>
+    <span class="n">predictions</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">predictions</span><span class="p">)</span>
+    <span class="n">predictions_std</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">predictions</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">])</span> <span class="o">*</span> \
+        <span class="n">config</span><span class="o">.</span><span class="n">pred_dist_std</span>
+    <span class="k">if</span> <span class="n">predictions</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">rho</span> <span class="o">=</span> <span class="n">predictions</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">1</span><span class="p">]</span> 
+        <span class="n">predictions_std</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">rho</span><span class="p">)</span> <span class="c1"># std</span>
+    <span class="n">predictions</span> <span class="o">=</span> <span class="n">predictions</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]</span> <span class="c1"># means</span>
+    <span class="n">y_samples</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="n">predictions</span><span class="p">,</span> <span class="n">predictions_std</span><span class="p">)</span>
+
+    <span class="c1">### Second, compute the densities of the above samples.</span>
+    <span class="n">predictions</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_models</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">mean_only</span><span class="p">:</span>
+            <span class="n">predictions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">mnet</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">x_torch</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="n">w_mean</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">predictions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">mnet</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">x_torch</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                           <span class="n">mean_only</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">extracted_mean</span><span class="o">=</span><span class="n">w_mean</span><span class="p">,</span>
+                           <span class="n">extracted_rho</span><span class="o">=</span><span class="n">w_rho</span><span class="p">))</span>
+    <span class="n">predictions</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">predictions</span><span class="p">)</span>
+    <span class="n">predictions_std</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">predictions</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">])</span> <span class="o">*</span> \
+        <span class="n">config</span><span class="o">.</span><span class="n">pred_dist_std</span>
+    <span class="k">if</span> <span class="n">predictions</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">rho</span> <span class="o">=</span> <span class="n">predictions</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">1</span><span class="p">]</span> <span class="c1"># standard deviations</span>
+        <span class="n">predictions_std</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">rho</span><span class="p">)</span> <span class="c1"># std</span>
+    <span class="n">predictions</span> <span class="o">=</span> <span class="n">predictions</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]</span> <span class="c1"># means</span>
+
+    <span class="n">predictions</span> <span class="o">=</span> <span class="n">predictions</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">num_samples</span><span class="p">)</span>
+    <span class="n">predictions_std</span> <span class="o">=</span> <span class="n">predictions_std</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">num_samples</span><span class="p">)</span>
+    <span class="n">normal_models</span> <span class="o">=</span> <span class="n">Normal</span><span class="p">(</span><span class="n">predictions</span><span class="p">,</span> <span class="n">predictions_std</span><span class="p">)</span>
+    <span class="n">prob</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">normal_models</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">y_samples</span><span class="o">.</span><span class="n">T</span><span class="p">))</span>
+    <span class="c1"># average across models</span>
+    <span class="n">logmean</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">prob</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">))</span>
+    <span class="c1"># average across samples</span>
+    <span class="n">entropy</span> <span class="o">=</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">logmean</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">entropy</span></div>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="k">pass</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">regression_uncertainty_mm</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents of this repository:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../gaussian_likelihoods.html">Gaussian Likelihoods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../norm_flow.html">Normalizing Flows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../networks.html">Networks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic.html">Probabilistic</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../datasets.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../utils.html">Utilities</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2021, Maria R. Cervera, Rafael Daetwyler, Hamza Keurti, Francesco dAngelo, Christian Henning.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

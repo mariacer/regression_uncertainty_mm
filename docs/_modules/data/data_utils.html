@@ -1,0 +1,727 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>data.data_utils &#8212; regression_uncertainty_mm 0.1 documentation</title>
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for data.data_utils</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># Copyright 2021 Maria Cervera</span>
+<span class="c1">#</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#    http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+<span class="c1">#</span>
+<span class="c1"># @title          :oodregression/data/data_utils.py</span>
+<span class="c1"># @author         :mc</span>
+<span class="c1"># @contact        :mariacer@ethz.ch</span>
+<span class="c1"># @created        :19/08/2021</span>
+<span class="c1"># @version        :1.0</span>
+<span class="c1"># @python_version :3.7.4</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Helper functions for generating different datasets</span>
+<span class="sd">--------------------------------------------------</span>
+
+<span class="sd">A collection of helper functions for generating datasets to keep other scripts</span>
+<span class="sd">clean.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">argparse</span> <span class="k">import</span> <span class="n">Namespace</span>
+<span class="kn">from</span> <span class="nn">hypnettorch.data.udacity_ch2</span> <span class="k">import</span> <span class="n">UdacityCh2Data</span>
+<span class="kn">from</span> <span class="nn">hypnettorch.utils</span> <span class="k">import</span> <span class="n">sim_utils</span> <span class="k">as</span> <span class="n">sutils</span>
+<span class="kn">import</span> <span class="nn">hypnettorch.utils.misc</span> <span class="k">as</span> <span class="nn">misc</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">pickle</span>
+<span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">from</span> <span class="nn">scipy</span> <span class="k">import</span> <span class="n">stats</span> <span class="k">as</span> <span class="n">spstats</span>
+<span class="kn">from</span> <span class="nn">sklearn.mixture</span> <span class="k">import</span> <span class="n">GaussianMixture</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">torch.utils.data</span> <span class="k">import</span> <span class="n">DataLoader</span>
+<span class="kn">import</span> <span class="nn">torchvision.datasets</span> <span class="k">as</span> <span class="nn">datasets</span>
+<span class="kn">from</span> <span class="nn">torchvision</span> <span class="k">import</span> <span class="n">transforms</span>
+
+<span class="kn">from</span> <span class="nn">data.regression2d_gaussian</span> <span class="k">import</span> <span class="n">BivariateToyRegression</span>
+<span class="kn">from</span> <span class="nn">data.regression2d_bimodal</span> <span class="k">import</span> <span class="n">BivariateBimodalRegression</span>
+<span class="kn">from</span> <span class="nn">data.regression2d_heteroscedastic</span> <span class="k">import</span> <span class="n">BivariateHeteroscedasticRegression</span>
+<span class="kn">from</span> <span class="nn">data.special.regression1d_data</span> <span class="k">import</span> <span class="n">ToyRegression</span>
+<span class="kn">from</span> <span class="nn">data.special.regression1d_bimodal_data</span> <span class="k">import</span> <span class="n">BimodalToyRegression</span>
+<span class="kn">import</span> <span class="nn">utils.math_utils</span> <span class="k">as</span> <span class="nn">mutils</span>
+
+<span class="c1"># Simple 1D regression grid.</span>
+<span class="n">_ONE_D_MISC</span> <span class="o">=</span> <span class="n">Namespace</span><span class="p">()</span>
+<span class="n">_ONE_D_MISC</span><span class="o">.</span><span class="n">x_range</span> <span class="o">=</span> <span class="p">[[</span><span class="o">-</span><span class="mf">6.5</span><span class="p">],</span> <span class="p">[</span><span class="mf">6.5</span><span class="p">]]</span>
+<span class="n">_ONE_D_MISC</span><span class="o">.</span><span class="n">x_range_vis</span> <span class="o">=</span> <span class="p">[</span><span class="o">-</span><span class="mf">6.5</span><span class="p">,</span> <span class="mf">6.5</span><span class="p">]</span>
+<span class="n">_ONE_D_MISC</span><span class="o">.</span><span class="n">y_range</span> <span class="o">=</span> <span class="p">[</span><span class="o">-</span><span class="mi">250</span><span class="p">,</span> <span class="mi">250</span><span class="p">]</span>
+<span class="n">_ONE_D_MISC</span><span class="o">.</span><span class="n">y_range_narrow</span> <span class="o">=</span> <span class="p">[</span><span class="o">-</span><span class="mi">80</span><span class="p">,</span> <span class="mi">80</span><span class="p">]</span>
+<span class="n">_ONE_D_MISC</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+<span class="n">_ONE_D_MISC</span><span class="o">.</span><span class="n">grid_size</span> <span class="o">=</span> <span class="mi">200</span>
+
+
+<span class="c1"># Simple 2D regression grid.</span>
+<span class="n">_TWO_D_MISC</span> <span class="o">=</span> <span class="n">Namespace</span><span class="p">()</span>
+<span class="n">_TWO_D_MISC</span><span class="o">.</span><span class="n">x_range</span> <span class="o">=</span> <span class="p">[</span><span class="o">-</span><span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">]</span>
+<span class="n">_TWO_D_MISC</span><span class="o">.</span><span class="n">x_range_vis</span> <span class="o">=</span> <span class="p">[</span><span class="o">-</span><span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">]</span>
+<span class="n">_TWO_D_MISC</span><span class="o">.</span><span class="n">y_range</span> <span class="o">=</span> <span class="p">[</span><span class="o">-</span><span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">]</span>
+<span class="n">_TWO_D_MISC</span><span class="o">.</span><span class="n">y_range_narrow</span> <span class="o">=</span> <span class="p">[</span><span class="o">-</span><span class="mi">80</span><span class="p">,</span> <span class="mi">80</span><span class="p">]</span>
+<span class="n">_TWO_D_MISC</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+<span class="n">_TWO_D_MISC</span><span class="o">.</span><span class="n">grid_size</span> <span class="o">=</span> <span class="mi">40</span>
+
+<div class="viewcode-block" id="generate_task"><a class="viewcode-back" href="../../datasets.html#data.data_utils.generate_task">[docs]</a><span class="k">def</span> <span class="nf">generate_task</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">writer</span><span class="p">,</span> <span class="n">dataset</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Generate a set of user defined tasks.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        config: Command-line arguments.</span>
+<span class="sd">        writer: Tensorboard writer, in case plots should be logged.</span>
+<span class="sd">        dataset (str): The name of the dataset to be used.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        (....): Tuple containing:</span>
+
+<span class="sd">        - **data_struct**: The data structure and data handler (for non</span>
+<span class="sd">            steering angle experiments).</span>
+<span class="sd">        - **tuple**: For the steering angle dataset, a tuple with train,</span>
+<span class="sd">            validation and test loaders.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">dataset</span> <span class="o">==</span> <span class="s1">&#39;toy_1D&#39;</span><span class="p">:</span>
+        <span class="n">train_inter</span> <span class="o">=</span> <span class="n">misc</span><span class="o">.</span><span class="n">str_to_ints</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">train_inter</span><span class="p">)</span>
+        <span class="n">test_inter</span> <span class="o">=</span> <span class="n">misc</span><span class="o">.</span><span class="n">str_to_ints</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">test_inter</span><span class="p">)</span>
+        <span class="n">val_inter</span> <span class="o">=</span> <span class="n">misc</span><span class="o">.</span><span class="n">str_to_ints</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">val_inter</span><span class="p">)</span>
+        <span class="n">num_val</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">val_set_size</span> <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">val_set_size</span> <span class="o">!=</span> <span class="mi">0</span> <span class="k">else</span> <span class="kc">None</span>
+
+        <span class="k">return</span> <span class="p">(</span><span class="n">_generate_1d_task</span><span class="p">(</span><span class="n">show_plots</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">show_plots</span><span class="p">,</span>
+                                 <span class="n">data_random_seed</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">data_random_seed</span><span class="p">,</span>
+                                 <span class="n">writer</span><span class="o">=</span><span class="kc">None</span> <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">no_plots</span> <span class="k">else</span> <span class="n">writer</span><span class="p">,</span>
+                                 <span class="n">train_func</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">train_func</span><span class="p">,</span>
+                                 <span class="n">train_inter</span><span class="o">=</span><span class="n">train_inter</span><span class="p">,</span>
+                                 <span class="n">num_train</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">num_train</span><span class="p">,</span> 
+                                 <span class="n">test_inter</span><span class="o">=</span><span class="n">test_inter</span><span class="p">,</span>
+                                 <span class="n">num_test</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">num_test</span><span class="p">,</span>
+                                 <span class="n">val_inter</span><span class="o">=</span><span class="n">val_inter</span><span class="p">,</span>
+                                 <span class="n">num_val</span><span class="o">=</span><span class="n">num_val</span><span class="p">,</span>
+                                 <span class="n">std</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">gaussian_variance</span><span class="p">),</span>
+                                 <span class="n">noise</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">noise</span><span class="p">),</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">dataset</span> <span class="o">==</span> <span class="s1">&#39;toy_2D&#39;</span><span class="p">:</span>
+        <span class="n">train_inter</span> <span class="o">=</span> <span class="n">misc</span><span class="o">.</span><span class="n">str_to_ints</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">train_inter</span><span class="p">)</span>
+        <span class="n">test_inter</span> <span class="o">=</span> <span class="n">misc</span><span class="o">.</span><span class="n">str_to_ints</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">test_inter</span><span class="p">)</span>
+        <span class="n">val_inter</span> <span class="o">=</span> <span class="n">misc</span><span class="o">.</span><span class="n">str_to_ints</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">val_inter</span><span class="p">)</span>
+        <span class="n">num_val</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">val_set_size</span> <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">val_set_size</span> <span class="o">!=</span> <span class="mi">0</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="n">cov</span> <span class="o">=</span> <span class="n">parse_cov_matrix</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">cov_matrix</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">(</span><span class="n">_generate_2d_task</span><span class="p">(</span><span class="n">show_plots</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">show_plots</span><span class="p">,</span>
+                                 <span class="n">data_random_seed</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">data_random_seed</span><span class="p">,</span>
+                                 <span class="n">writer</span><span class="o">=</span><span class="kc">None</span> <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">no_plots</span> <span class="k">else</span> <span class="n">writer</span><span class="p">,</span>
+                                 <span class="n">train_func</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">train_func</span><span class="p">,</span>
+                                 <span class="n">train_inter</span><span class="o">=</span><span class="n">train_inter</span><span class="p">,</span>
+                                 <span class="n">num_train</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">num_train</span><span class="p">,</span> 
+                                 <span class="n">test_inter</span><span class="o">=</span><span class="n">test_inter</span><span class="p">,</span>
+                                 <span class="n">num_test</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">num_test</span><span class="p">,</span>
+                                 <span class="n">val_inter</span><span class="o">=</span><span class="n">val_inter</span><span class="p">,</span>
+                                 <span class="n">num_val</span><span class="o">=</span><span class="n">num_val</span><span class="p">,</span>
+                                 <span class="n">noise</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">noise</span><span class="p">,</span>
+                                 <span class="n">cov</span><span class="o">=</span><span class="n">cov</span><span class="p">,</span>
+                                 <span class="n">offset</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">offset</span><span class="p">,</span>
+                                 <span class="n">rot_angle</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">rot_angle</span><span class="p">),</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">dataset</span> <span class="o">==</span> <span class="s1">&#39;steering_angle&#39;</span><span class="p">:</span>
+        <span class="n">data</span><span class="p">,</span> <span class="n">train_loader</span><span class="p">,</span> <span class="n">val_loader</span><span class="p">,</span> <span class="n">test_loader</span> <span class="o">=</span> <span class="n">open_udacity_ch2</span><span class="p">(</span><span class="n">config</span><span class="p">,</span>
+                                                      <span class="n">create_train_loader</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">data</span><span class="p">,</span> <span class="p">(</span><span class="n">train_loader</span><span class="p">,</span> <span class="n">val_loader</span><span class="p">,</span> <span class="n">test_loader</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+
+
+<span class="k">def</span> <span class="nf">_generate_1d_task</span><span class="p">(</span><span class="n">show_plots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">data_random_seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                      <span class="n">train_func</span><span class="o">=</span><span class="s1">&#39;cube&#39;</span><span class="p">,</span> <span class="n">train_inter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_train</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
+                      <span class="n">test_inter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_test</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">val_inter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                      <span class="n">num_val</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">noise</span><span class="o">=</span><span class="s1">&#39;gaussian&#39;</span><span class="p">,</span> <span class="n">std</span><span class="o">=</span><span class="mi">3</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Generate a set of tasks for 1D regression.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        show_plots: Visualize the generated datasets.</span>
+<span class="sd">        data_random_seed: Random seed that should be applied to the</span>
+<span class="sd">            synthetic data generation.</span>
+<span class="sd">        writer: Tensorboard writer, in case plots should be logged.</span>
+<span class="sd">        train_func: Descriptor of 1D function to be learned.</span>
+<span class="sd">        train_inter: Training interval.</span>
+<span class="sd">        num_train: The number of training points.</span>
+<span class="sd">        test_inter: Test interval.</span>
+<span class="sd">        num_test: The number of test points.</span>
+<span class="sd">        val_inter: validation interval.</span>
+<span class="sd">        num_val: The number of validation points.</span>
+<span class="sd">        std: The standard deviation of the Gaussian modes.</span>
+<span class="sd">        noise (str, optional): The type of noise to be used.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        data_handler: A data handler.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">train_inter</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">train_inter</span> <span class="o">=</span> <span class="p">[</span><span class="o">-</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">test_inter</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">test_inter</span> <span class="o">=</span> <span class="p">[</span><span class="o">-</span><span class="mi">6</span><span class="p">,</span> <span class="mi">6</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">num_val</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">val_inter</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">val_inter</span> <span class="o">=</span> <span class="n">train_inter</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">val_inter</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="n">funcs</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;cube&#39;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="p">(</span><span class="n">x</span> <span class="o">**</span> <span class="mf">3.</span><span class="p">),</span>
+             <span class="s1">&#39;wavelet&#39;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="p">(</span><span class="mi">80</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">x</span><span class="p">))),</span>
+             <span class="s1">&#39;sin&#39;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="p">(</span><span class="mi">80</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="mf">1.5</span><span class="o">*</span><span class="n">x</span><span class="p">))}</span>
+
+    <span class="k">if</span> <span class="n">train_func</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">funcs</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s1">&#39;Regression function </span><span class="si">%s</span><span class="s1"> not implemented!&#39;</span>
+                                  <span class="o">%</span> <span class="n">train_func</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">noise</span> <span class="o">==</span> <span class="s1">&#39;bimodal&#39;</span><span class="p">:</span>
+        <span class="n">dhandler</span> <span class="o">=</span> <span class="n">BimodalToyRegression</span><span class="p">(</span><span class="n">train_inter</span><span class="o">=</span><span class="n">train_inter</span><span class="p">,</span>
+            <span class="n">num_train</span><span class="o">=</span><span class="n">num_train</span><span class="p">,</span> <span class="n">val_inter</span><span class="o">=</span><span class="n">val_inter</span><span class="p">,</span> <span class="n">num_val</span><span class="o">=</span><span class="n">num_val</span><span class="p">,</span>
+            <span class="n">test_inter</span><span class="o">=</span><span class="n">test_inter</span><span class="p">,</span> <span class="n">num_test</span><span class="o">=</span><span class="n">num_test</span><span class="p">,</span>
+            <span class="n">map_function</span><span class="o">=</span><span class="n">funcs</span><span class="p">[</span><span class="n">train_func</span><span class="p">],</span> <span class="n">dist1</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">std1</span><span class="o">=</span><span class="n">std</span><span class="p">,</span>
+            <span class="n">rseed</span><span class="o">=</span><span class="n">data_random_seed</span><span class="p">,</span> <span class="n">perturb_test_val</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">noise</span> <span class="o">==</span> <span class="s1">&#39;gaussian&#39;</span><span class="p">:</span>
+        <span class="n">dhandler</span> <span class="o">=</span> <span class="n">ToyRegression</span><span class="p">(</span><span class="n">train_inter</span><span class="o">=</span><span class="n">train_inter</span><span class="p">,</span> <span class="n">num_train</span><span class="o">=</span><span class="n">num_train</span><span class="p">,</span>
+                             <span class="n">test_inter</span><span class="o">=</span><span class="n">test_inter</span><span class="p">,</span> <span class="n">num_test</span><span class="o">=</span><span class="n">num_test</span><span class="p">,</span>
+                             <span class="n">val_inter</span><span class="o">=</span><span class="n">val_inter</span><span class="p">,</span> <span class="n">num_val</span><span class="o">=</span><span class="n">num_val</span><span class="p">,</span>
+                             <span class="n">map_function</span><span class="o">=</span><span class="n">funcs</span><span class="p">[</span><span class="n">train_func</span><span class="p">],</span> <span class="n">std</span><span class="o">=</span><span class="n">std</span><span class="p">,</span>
+                             <span class="n">rseed</span><span class="o">=</span><span class="n">data_random_seed</span><span class="p">,</span> <span class="n">perturb_test_val</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s1">&#39;Noise type &quot;</span><span class="si">%s</span><span class="s1">&quot; not implemented.&#39;</span> <span class="o">%</span> <span class="n">noise</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">writer</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">dhandler</span><span class="o">.</span><span class="n">plot_dataset</span><span class="p">(</span><span class="n">show</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">writer</span><span class="o">.</span><span class="n">add_figure</span><span class="p">(</span><span class="s1">&#39;task/dataset&#39;</span><span class="p">,</span> <span class="n">plt</span><span class="o">.</span><span class="n">gcf</span><span class="p">(),</span> <span class="n">close</span><span class="o">=</span><span class="ow">not</span> <span class="n">show_plots</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">show_plots</span><span class="p">:</span>
+            <span class="n">misc</span><span class="o">.</span><span class="n">repair_canvas_and_show_fig</span><span class="p">(</span><span class="n">plt</span><span class="o">.</span><span class="n">gcf</span><span class="p">())</span>
+    <span class="k">elif</span> <span class="n">show_plots</span><span class="p">:</span>
+        <span class="n">dhandler</span><span class="o">.</span><span class="n">plot_dataset</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">dhandler</span>
+
+<span class="k">def</span> <span class="nf">_generate_2d_task</span><span class="p">(</span><span class="n">show_plots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">data_random_seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">writer</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                      <span class="n">train_func</span><span class="o">=</span><span class="s1">&#39;cube&#39;</span><span class="p">,</span> <span class="n">train_inter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_train</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
+                      <span class="n">test_inter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_test</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">val_inter</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_val</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
+                      <span class="n">noise</span><span class="o">=</span><span class="s1">&#39;gaussian&#39;</span><span class="p">,</span> <span class="n">cov</span><span class="o">=</span><span class="mi">9</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">rot_angle</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Generate a set of tasks for 1D regression.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        show_plots: Visualize the generated datasets.</span>
+<span class="sd">        data_random_seed: Random seed that should be applied to the</span>
+<span class="sd">            synthetic data generation.</span>
+<span class="sd">        writer: Tensorboard writer, in case plots should be logged.</span>
+<span class="sd">        train_func: Descriptor of 1D function to be learned.</span>
+<span class="sd">        train_inter: Training interval.</span>
+<span class="sd">        num_train: The number of training points.</span>
+<span class="sd">        test_inter: Test interval.</span>
+<span class="sd">        num_test: The number of test points.</span>
+<span class="sd">        val_inter: validation interval.</span>
+<span class="sd">        num_val: The number of validation points.</span>
+<span class="sd">        cov_matrix: cov_matrix of the noise.</span>
+<span class="sd">        noise (str, optional): The type of noise to be used.</span>
+<span class="sd">        offset: half the distance between the two modes of a bimodal </span>
+<span class="sd">            noise.</span>
+<span class="sd">        rot_angle: Rotation angle for the bimodal noise.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        data_handler: A data handler.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">train_inter</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">train_inter</span> <span class="o">=</span> <span class="p">[</span><span class="o">-</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">test_inter</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">test_inter</span> <span class="o">=</span> <span class="p">[</span><span class="o">-</span><span class="mi">6</span><span class="p">,</span> <span class="mi">6</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">val_inter</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">val_inter</span> <span class="o">=</span> <span class="n">train_inter</span>
+    <span class="n">funcs</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;cube&#39;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="p">(</span><span class="n">x</span> <span class="o">**</span> <span class="mf">3.</span><span class="p">),</span>
+             <span class="s1">&#39;wavelet&#39;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="p">(</span><span class="mi">80</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">x</span><span class="p">))),</span>
+             <span class="s1">&#39;sin&#39;</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="p">(</span><span class="mi">80</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="mf">1.5</span><span class="o">*</span><span class="n">x</span><span class="p">))}</span>
+
+    <span class="k">if</span> <span class="n">train_func</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">funcs</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s1">&#39;Regression function </span><span class="si">%s</span><span class="s1"> not implemented!&#39;</span>
+                                  <span class="o">%</span> <span class="n">train_func</span><span class="p">)</span>
+    
+    <span class="n">map_function</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span><span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">(</span>
+        <span class="p">[</span><span class="n">funcs</span><span class="p">[</span><span class="n">train_func</span><span class="p">](</span><span class="n">x</span><span class="p">),</span><span class="n">funcs</span><span class="p">[</span><span class="n">train_func</span><span class="p">](</span><span class="n">x</span><span class="p">)])</span>
+
+    <span class="k">if</span> <span class="n">noise</span> <span class="o">==</span> <span class="s1">&#39;gaussian&#39;</span><span class="p">:</span>
+        <span class="n">dhandler</span> <span class="o">=</span> <span class="n">BivariateToyRegression</span><span class="p">(</span><span class="n">train_inter</span><span class="o">=</span><span class="n">train_inter</span><span class="p">,</span> 
+                             <span class="n">num_train</span><span class="o">=</span><span class="n">num_train</span><span class="p">,</span> <span class="n">test_inter</span><span class="o">=</span><span class="n">test_inter</span><span class="p">,</span> 
+                             <span class="n">num_test</span><span class="o">=</span><span class="n">num_test</span><span class="p">,</span> <span class="n">val_inter</span><span class="o">=</span><span class="n">val_inter</span><span class="p">,</span> 
+                             <span class="n">num_val</span><span class="o">=</span><span class="n">num_val</span><span class="p">,</span> <span class="n">map_function</span><span class="o">=</span><span class="n">map_function</span><span class="p">,</span> 
+                             <span class="n">cov</span><span class="o">=</span><span class="n">cov</span><span class="p">,</span> <span class="n">rseed</span><span class="o">=</span><span class="n">data_random_seed</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">noise</span> <span class="o">==</span> <span class="s1">&#39;bimodal&#39;</span><span class="p">:</span>
+        <span class="n">dhandler</span> <span class="o">=</span> <span class="n">BivariateBimodalRegression</span><span class="p">(</span><span class="n">train_inter</span><span class="o">=</span><span class="n">train_inter</span><span class="p">,</span> 
+                             <span class="n">num_train</span><span class="o">=</span><span class="n">num_train</span><span class="p">,</span> <span class="n">test_inter</span><span class="o">=</span><span class="n">test_inter</span><span class="p">,</span> 
+                             <span class="n">num_test</span><span class="o">=</span><span class="n">num_test</span><span class="p">,</span> <span class="n">val_inter</span><span class="o">=</span><span class="n">val_inter</span><span class="p">,</span> 
+                             <span class="n">num_val</span><span class="o">=</span><span class="n">num_val</span><span class="p">,</span> <span class="n">map_function</span><span class="o">=</span><span class="n">map_function</span><span class="p">,</span> 
+                             <span class="n">cov</span><span class="o">=</span><span class="n">cov</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="n">offset</span><span class="p">,</span> <span class="n">rot_angle</span><span class="o">=</span><span class="n">rot_angle</span><span class="p">,</span> 
+                             <span class="n">rseed</span><span class="o">=</span><span class="n">data_random_seed</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">noise</span> <span class="o">==</span> <span class="s1">&#39;heteroscedastic&#39;</span><span class="p">:</span>
+        <span class="n">dhandler</span> <span class="o">=</span> <span class="n">BivariateHeteroscedasticRegression</span><span class="p">(</span><span class="n">train_inter</span><span class="o">=</span><span class="n">train_inter</span><span class="p">,</span> 
+                             <span class="n">num_train</span><span class="o">=</span><span class="n">num_train</span><span class="p">,</span> <span class="n">test_inter</span><span class="o">=</span><span class="n">test_inter</span><span class="p">,</span> 
+                             <span class="n">num_test</span><span class="o">=</span><span class="n">num_test</span><span class="p">,</span> <span class="n">val_inter</span><span class="o">=</span><span class="n">val_inter</span><span class="p">,</span> 
+                             <span class="n">num_val</span><span class="o">=</span><span class="n">num_val</span><span class="p">,</span> <span class="n">map_function</span><span class="o">=</span><span class="n">map_function</span><span class="p">,</span> 
+                             <span class="n">cov</span><span class="o">=</span><span class="n">cov</span><span class="p">,</span> <span class="n">rseed</span><span class="o">=</span><span class="n">data_random_seed</span><span class="p">)</span>
+    
+    <span class="k">return</span> <span class="n">dhandler</span>
+
+<div class="viewcode-block" id="parse_cov_matrix"><a class="viewcode-back" href="../../datasets.html#data.data_utils.parse_cov_matrix">[docs]</a><span class="k">def</span> <span class="nf">parse_cov_matrix</span><span class="p">(</span><span class="n">cov_str</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Parse a command line string cov matrix into a list of floats. </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cov_str</span><span class="p">,</span><span class="nb">str</span><span class="p">):</span>
+        <span class="s2">&quot;Assuming it is then already in valid form&quot;</span>
+        <span class="k">return</span> <span class="n">cov_str</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">tokens</span> <span class="o">=</span> <span class="n">cov_str</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">)</span>
+        <span class="n">tokens_float</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;[&#39;</span><span class="p">,</span><span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;]&#39;</span><span class="p">,</span><span class="s1">&#39;&#39;</span><span class="p">))</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">tokens</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">tokens_float</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">tokens_float</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">tokens_float</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">tokens_float</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="n">tokens_float</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">tokens_float</span><span class="p">)</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span>
+                <span class="p">[</span><span class="n">tokens_float</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="n">tokens_float</span><span class="p">[</span><span class="mi">1</span><span class="p">]],</span>
+                <span class="p">[</span><span class="n">tokens_float</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span><span class="n">tokens_float</span><span class="p">[</span><span class="mi">3</span><span class="p">]]</span>
+            <span class="p">]</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;cov_matrix should contain 1,2 or 4 floats, &#39;</span><span class="o">+</span> \
+            <span class="n">f</span><span class="s1">&#39;but {len(tokens_float)} were given.&#39;</span><span class="p">)</span></div>
+<div class="viewcode-block" id="open_udacity_ch2"><a class="viewcode-back" href="../../datasets.html#data.data_utils.open_udacity_ch2">[docs]</a><span class="k">def</span> <span class="nf">open_udacity_ch2</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">create_train_loader</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Open the UdacityCh2 dataset and create the corresponding dataloaders.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        config: Command-line options.</span>
+<span class="sd">        batch_size: Batchsize for all data loaders.</span>
+<span class="sd">        create_train_loader (bool): Whether a loader for the training set should</span>
+<span class="sd">            be generated.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        (tuple): Tuple containing:</span>
+
+<span class="sd">        ``[data_handler, train_loader, val_loader, test_loader]``</span>
+<span class="sd">        Note, ``train_loader`` and ``val_loader`` might be ``None``.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">UdacityCh2Data</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">data_dir</span><span class="p">,</span>
+                          <span class="n">num_val</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">val_set_size</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">create_train_loader</span><span class="p">:</span>
+        <span class="n">train_loader</span> <span class="o">=</span> <span class="n">DataLoader</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">torch_train</span><span class="p">,</span>
+            <span class="n">batch_size</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">num_workers</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">num_workers</span><span class="p">,</span> <span class="n">pin_memory</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">worker_init_fn</span><span class="o">=</span><span class="n">_dloader_worker_init</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">change_rseed</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">train_loader</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="c1"># Validation loader is treated like a test loader (see data augmentation</span>
+    <span class="c1"># of UdacityCh2Data class).</span>
+    <span class="k">if</span> <span class="n">data</span><span class="o">.</span><span class="n">num_val_samples</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">val_loader</span> <span class="o">=</span> <span class="n">DataLoader</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">torch_val</span><span class="p">,</span>
+            <span class="n">batch_size</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">val_batch_size</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">num_workers</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">num_workers</span><span class="p">,</span> <span class="n">pin_memory</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">worker_init_fn</span><span class="o">=</span><span class="n">_dloader_worker_init</span><span class="p">(</span><span class="n">config</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">val_loader</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="n">test_loader</span> <span class="o">=</span> <span class="n">DataLoader</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">torch_test</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">val_batch_size</span><span class="p">,</span>
+        <span class="n">shuffle</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">num_workers</span><span class="p">,</span> <span class="n">pin_memory</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">worker_init_fn</span><span class="o">=</span><span class="n">_dloader_worker_init</span><span class="p">(</span><span class="n">config</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">data</span><span class="p">,</span> <span class="n">train_loader</span><span class="p">,</span> <span class="n">val_loader</span><span class="p">,</span> <span class="n">test_loader</span></div>
+
+<span class="k">def</span> <span class="nf">_dloader_worker_init</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">change_rseed</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Provides an initialization function for the workers of an PyTorch</span>
+<span class="sd">    dataloader.</span>
+
+<span class="sd">    The returned function ensures:</span>
+<span class="sd">        - Every worker will have a different random seed. Note, this will</span>
+<span class="sd">          not make the overall computation deterministic, as the workers</span>
+<span class="sd">          are still scheduled by the operating system. Though, it can ensure</span>
+<span class="sd">          that computations are similarly pseudo-random as when using no</span>
+<span class="sd">          multi processing. For instance, assume data augmentation is</span>
+<span class="sd">          applied to images. If the seed was just copied to all workers,</span>
+<span class="sd">          then the same random augmentation will be applied several times.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        config: Command-line arguments.</span>
+<span class="sd">        change_rseed (bool): Whether the random seed of each worker</span>
+<span class="sd">            should be explicitly set to a different value.</span>
+<span class="sd">            In the normal case, randomness (stemming from random seeds, not</span>
+<span class="sd">            from hardware) should only affect a training set loader.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A function handle, that can be passed to argument ``worker_init_fn``</span>
+<span class="sd">        of class :class:`torch.utils.data.DataLoader`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">_w_init</span><span class="p">(</span><span class="n">w_id</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">change_rseed</span><span class="p">:</span>
+            <span class="n">wseed</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">random_seed</span> <span class="o">+</span> <span class="n">w_id</span>
+
+            <span class="n">torch</span><span class="o">.</span><span class="n">manual_seed</span><span class="p">(</span><span class="n">wseed</span><span class="p">)</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">manual_seed_all</span><span class="p">(</span><span class="n">wseed</span><span class="p">)</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">wseed</span><span class="p">)</span>
+            <span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">wseed</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">_w_init</span>
+
+<div class="viewcode-block" id="test_splitting_image"><a class="viewcode-back" href="../../datasets.html#data.data_utils.test_splitting_image">[docs]</a><span class="k">def</span> <span class="nf">test_splitting_image</span><span class="p">(</span><span class="n">mnet</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">shared</span><span class="p">,</span> <span class="n">logger</span><span class="p">,</span> <span class="n">writer</span><span class="p">,</span>
+                         <span class="n">mode</span><span class="p">,</span> <span class="n">hnet</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">epoch</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Test the networks on an image with splitting lanes.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        mnet: The main network.</span>
+<span class="sd">        device: The device.</span>
+<span class="sd">        config: The configuration.</span>
+<span class="sd">        shared: Namespace with useful information.</span>
+<span class="sd">        logger: The logger.</span>
+<span class="sd">        writer: The tensorboard writer.</span>
+<span class="sd">        mode: The mode of the experiment (`gl`, `ghl` or `nf`).</span>
+<span class="sd">        hnet: The (optional) hypernetwork.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># If the hypernetwork is provided, we are in an NF experiment, and the means</span>
+    <span class="c1"># and variances refer to it.</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Testing on split lane image...&#39;</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+
+        <span class="n">image_path1</span><span class="o">=</span><span class="s1">&#39;split_lane/rafael_swiss_road_256x192.png&#39;</span>
+        <span class="n">image_path2</span><span class="o">=</span><span class="s1">&#39;split_lane/rafael_swiss_road_256x192_2.png&#39;</span>
+
+        <span class="c1"># Load the image.</span>
+        <span class="n">X1</span> <span class="o">=</span> <span class="n">load_image</span><span class="p">(</span><span class="n">image_path1</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="n">X2</span> <span class="o">=</span> <span class="n">load_image</span><span class="p">(</span><span class="n">image_path2</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+
+        <span class="c1"># Plot the predictions.</span>
+        <span class="n">figname</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">config</span><span class="o">.</span><span class="n">no_plots</span><span class="p">:</span>
+            <span class="n">fig_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">out_dir</span><span class="p">,</span> <span class="s1">&#39;figures&#39;</span><span class="p">)</span>
+            <span class="n">figname</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">fig_dir</span><span class="p">,</span> <span class="s1">&#39;split_lane_prediction&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">epoch</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">figname</span> <span class="o">+=</span> <span class="s1">&#39;_epoch</span><span class="si">%i</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">epoch</span>
+        <span class="kn">from</span> <span class="nn">data</span> <span class="k">import</span> <span class="n">plotting_utils</span> <span class="k">as</span> <span class="n">plt_utils</span>
+        <span class="n">plt_utils</span><span class="o">.</span><span class="n">plot_pred_dist_steering</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">writer</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">mnet</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span>
+                                <span class="n">hnet</span><span class="o">=</span><span class="n">hnet</span><span class="p">,</span> <span class="n">figname</span><span class="o">=</span><span class="n">figname</span><span class="p">,</span>
+                                <span class="n">publication_style</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">publication_style</span><span class="p">,</span>
+                                <span class="n">plot_groundtruth</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">plot_images</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                <span class="n">input_images</span><span class="o">=</span><span class="p">[</span><span class="n">X1</span><span class="p">,</span> <span class="n">X2</span><span class="p">],</span> <span class="n">save_predictions</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="load_image"><a class="viewcode-back" href="../../datasets.html#data.data_utils.load_image">[docs]</a><span class="k">def</span> <span class="nf">load_image</span><span class="p">(</span><span class="n">image_path</span><span class="p">,</span> <span class="n">folder_path</span><span class="o">=</span><span class="s1">&#39;../data/splitting_lane_images/&#39;</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Load a certain image and make it suitable for torch processing.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        folder_path (str): The path to the container folder. Note that this</span>
+<span class="sd">            folder needs to have subfolders for images to be properly loaded.</span>
+<span class="sd">        image_path (str): The path to the image within the container folder.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">img_name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">folder_path</span><span class="p">,</span> <span class="n">image_path</span><span class="p">)</span>
+    <span class="n">_</span><span class="p">,</span> <span class="n">test_transform</span> <span class="o">=</span> <span class="n">UdacityCh2Data</span><span class="o">.</span><span class="n">torch_input_transforms</span><span class="p">()</span>
+    <span class="n">img_folder</span> <span class="o">=</span> <span class="n">datasets</span><span class="o">.</span><span class="n">ImageFolder</span><span class="p">(</span><span class="n">folder_path</span><span class="p">,</span> <span class="n">test_transform</span><span class="p">)</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">img_folder</span><span class="o">.</span><span class="n">loader</span><span class="p">(</span><span class="n">img_name</span><span class="p">)</span>
+    <span class="n">trans</span> <span class="o">=</span> <span class="n">transforms</span><span class="o">.</span><span class="n">ToTensor</span><span class="p">()</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">trans</span><span class="p">(</span><span class="n">X</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="c1"># add a batch dimension</span>
+    <span class="c1"># X = X.permute(0, 1, 3, 2) # make compatible to how images are normally</span>
+
+    <span class="k">return</span> <span class="n">X</span></div>
+
+<div class="viewcode-block" id="compute_1D_uncertainty_stats"><a class="viewcode-back" href="../../datasets.html#data.data_utils.compute_1D_uncertainty_stats">[docs]</a><span class="k">def</span> <span class="nf">compute_1D_uncertainty_stats</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">writer</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">mnet</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span>
+                                 <span class="n">hnet</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">log_likelihood</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Compute uncertainty statistics for 1D toy regression experiments.</span>
+
+<span class="sd">    In particular, this function computes the mean, the variance, the entropy,</span>
+<span class="sd">    the multi-modality score and the model disagreement (for Bayesian models)</span>
+<span class="sd">    at a specific input location determined by the input ``x``.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        config: Command-line arguments.</span>
+<span class="sd">        writer: Tensorboard summary writer.</span>
+<span class="sd">        data: A data loader.</span>
+<span class="sd">        mnet: The network.</span>
+<span class="sd">        device: The cuda device.</span>
+<span class="sd">        hnet: The (optional) hypernetwork. Provided when the model is a NF.</span>
+<span class="sd">        log_likelihood (bool): Whether to plot the likelihood in a log scale.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        (dict): Dictionary with all relevant statistics at the requested point.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">stats</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;model&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;mean&#39;</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;variance&#39;</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;entropy&#39;</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+                 <span class="s1">&#39;multimodality&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;p&#39;</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="s1">&#39;d&#39;</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="s1">&#39;isunimodal&#39;</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">},</span>
+                 <span class="s1">&#39;model_disagreement&#39;</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;det&#39;</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">mean_only</span><span class="p">},</span>
+             <span class="s1">&#39;ground_truth&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;mean&#39;</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;variance&#39;</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;entropy&#39;</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+                 <span class="s1">&#39;multimodality&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;p&#39;</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="s1">&#39;d&#39;</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="s1">&#39;isunimodal&#39;</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">},</span> 
+                 <span class="s1">&#39;num_train&#39;</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">num_train</span><span class="p">}}</span>
+
+    <span class="c1">### Prepare the data.</span>
+    <span class="c1"># This function is only valid at the origin, since we know there what the</span>
+    <span class="c1"># ground-truth means and variances are. Else we&#39;d have to go to the data</span>
+    <span class="c1"># generating functions and compute it.</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">*</span><span class="n">_ONE_D_MISC</span><span class="o">.</span><span class="n">y_range</span><span class="p">,</span> <span class="mi">1000</span><span class="p">)</span>
+    <span class="n">x_torch</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">input_to_torch_tensor</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">input_to_torch_tensor</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">hnet</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Need a matrix with all y values at which to evaluate the density.</span>
+        <span class="n">T</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">input_to_torch_tensor</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+        <span class="n">T</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">vstack</span><span class="p">([</span><span class="n">T</span><span class="p">]</span> <span class="o">*</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">T</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">T</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">T</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">T</span><span class="p">,</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,))</span>
+
+    <span class="c1">### Make predictions.</span>
+    <span class="k">if</span> <span class="n">hnet</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">predictions</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">val_sample_size</span><span class="p">)</span>
+        <span class="n">predictions_std</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">val_sample_size</span><span class="p">)</span> \
+            <span class="o">*</span> <span class="n">config</span><span class="o">.</span><span class="n">pred_dist_std</span> <span class="c1"># default std, overwritten below for ghl</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">predictions</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">y</span><span class="p">),</span> <span class="n">config</span><span class="o">.</span><span class="n">val_sample_size</span><span class="p">))</span>
+ 
+    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">val_sample_size</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">hnet</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> <span class="c1"># gl or ghl</span>
+            <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">mean_only</span><span class="p">:</span>
+                <span class="n">Y</span> <span class="o">=</span> <span class="n">mnet</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">w_mean</span><span class="p">,</span> <span class="n">w_rho</span> <span class="o">=</span> <span class="n">mnet</span><span class="o">.</span><span class="n">extract_mean_and_rho</span><span class="p">()</span>
+                <span class="n">Y</span> <span class="o">=</span> <span class="n">mnet</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mean_only</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                 <span class="n">extracted_mean</span><span class="o">=</span><span class="n">w_mean</span><span class="p">,</span> <span class="n">extracted_rho</span><span class="o">=</span><span class="n">w_rho</span><span class="p">,</span>
+                                 <span class="n">disable_lrt</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="n">predictions</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">Y</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">log_likelihood</span><span class="p">:</span>
+                <span class="n">predictions</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">predictions</span><span class="p">[</span><span class="n">j</span><span class="p">])</span>
+
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">Y</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="n">rho</span> <span class="o">=</span> <span class="n">Y</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()</span>
+                <span class="n">predictions_std</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">rho</span><span class="p">)</span>   
+            
+            <span class="c1"># Store parameters to compute model disagreement.</span>
+            <span class="k">if</span> <span class="n">j</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">params</span> <span class="o">=</span> <span class="n">Y</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">params</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">vstack</span><span class="p">((</span><span class="n">params</span><span class="p">,</span> <span class="n">Y</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">X</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">mean_only</span><span class="p">:</span>
+                <span class="n">flow_weights</span> <span class="o">=</span> <span class="n">hnet</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">ret_format</span><span class="o">=</span><span class="s1">&#39;flattened&#39;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">w_mean</span><span class="p">,</span> <span class="n">w_rho</span> <span class="o">=</span> <span class="n">hnet</span><span class="o">.</span><span class="n">extract_mean_and_rho</span><span class="p">(</span><span class="n">weights</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+                <span class="c1"># Note, the sampling will happen inside the forward method.</span>
+                <span class="n">flow_weights</span> <span class="o">=</span> <span class="n">hnet</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mean_only</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                            <span class="n">extracted_mean</span><span class="o">=</span><span class="n">w_mean</span><span class="p">,</span>
+                                            <span class="n">extracted_rho</span><span class="o">=</span><span class="n">w_rho</span><span class="p">,</span>
+                                            <span class="n">ret_format</span><span class="o">=</span><span class="s1">&#39;flattened&#39;</span><span class="p">)</span>
+            <span class="n">flow_weights</span> <span class="o">=</span> <span class="n">flow_weights</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">y</span><span class="p">),</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">Y</span><span class="p">,</span> <span class="n">logabsdet</span> <span class="o">=</span> <span class="n">mnet</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">T</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="n">flow_weights</span><span class="p">)</span>
+            <span class="n">Y</span> <span class="o">=</span> <span class="n">mnet</span><span class="o">.</span><span class="n">log_p0</span><span class="p">(</span><span class="n">Y</span><span class="p">)</span> <span class="o">+</span> <span class="n">logabsdet</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">log_likelihood</span><span class="p">:</span>
+                <span class="n">Y</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">Y</span><span class="p">)</span>
+            <span class="n">Y</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">Y</span><span class="p">,</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">y</span><span class="p">),</span> <span class="mi">1</span><span class="p">))</span>
+            <span class="n">predictions</span><span class="p">[:,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">Y</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()</span>
+
+            <span class="c1"># Store parameters to compute model disagreement.</span>
+            <span class="k">if</span> <span class="n">j</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">params</span> <span class="o">=</span> <span class="n">flow_weights</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">params</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">vstack</span><span class="p">((</span><span class="n">params</span><span class="p">,</span> <span class="n">flow_weights</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()))</span>
+
+    <span class="c1">### Determine the density, averaged across models.</span>
+    <span class="n">z_indv</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">y</span><span class="p">),</span> <span class="n">config</span><span class="o">.</span><span class="n">val_sample_size</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">val_sample_size</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">hnet</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> <span class="c1"># gl or ghl</span>
+            <span class="n">z_indv</span><span class="p">[:,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">mutils</span><span class="o">.</span><span class="n">normal_dist</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">predictions</span><span class="p">[</span><span class="n">j</span><span class="p">],</span>
+                                              <span class="n">predictions_std</span><span class="p">[</span><span class="n">j</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">z_indv</span><span class="p">[:,</span> <span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">predictions</span><span class="p">[:,</span> <span class="n">j</span><span class="p">]</span>
+    <span class="n">z</span> <span class="o">=</span> <span class="n">z_indv</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span> <span class="c1"># average across models</span>
+    <span class="c1"># Convert to an actual density so that it sums up to one.</span>
+    <span class="n">z</span> <span class="o">/=</span> <span class="p">(</span><span class="n">z</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">*</span><span class="nb">len</span><span class="p">(</span><span class="n">y</span><span class="p">))</span>
+
+    <span class="c1">### Obtain statistics.</span>
+    <span class="k">if</span> <span class="n">hnet</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">config</span><span class="o">.</span><span class="n">mean_only</span><span class="p">:</span>
+        <span class="c1"># For Gaussian likelihood based deterministic models we can compute</span>
+        <span class="c1"># things analytically.</span>
+        <span class="n">stats</span><span class="p">[</span><span class="s1">&#39;model&#39;</span><span class="p">][</span><span class="s1">&#39;mean&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">predictions</span> 
+        <span class="n">stats</span><span class="p">[</span><span class="s1">&#39;model&#39;</span><span class="p">][</span><span class="s1">&#39;variance&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">predictions_std</span><span class="o">**</span><span class="mi">2</span>
+        <span class="n">stats</span><span class="p">[</span><span class="s1">&#39;model&#39;</span><span class="p">][</span><span class="s1">&#39;entropy&#39;</span><span class="p">]</span> <span class="o">=</span> \
+                    <span class="mf">0.5</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">predictions_std</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="mf">0.5</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">model_mean</span> <span class="o">=</span> <span class="p">(</span><span class="n">z</span> <span class="o">*</span> <span class="n">y</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+        <span class="n">stats</span><span class="p">[</span><span class="s1">&#39;model&#39;</span><span class="p">][</span><span class="s1">&#39;mean&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">model_mean</span>
+        <span class="n">stats</span><span class="p">[</span><span class="s1">&#39;model&#39;</span><span class="p">][</span><span class="s1">&#39;variance&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">z</span> <span class="o">*</span> <span class="p">(</span><span class="n">y</span> <span class="o">-</span> <span class="n">model_mean</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+        <span class="n">stats</span><span class="p">[</span><span class="s1">&#39;model&#39;</span><span class="p">][</span><span class="s1">&#39;entropy&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span> <span class="p">(</span><span class="n">z</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">z</span><span class="p">))</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">val_sample_size</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">stats</span><span class="p">[</span><span class="s1">&#39;model&#39;</span><span class="p">][</span><span class="s1">&#39;model_disagreement&#39;</span><span class="p">]</span> <span class="o">=</span> \
+                                        <span class="n">compute_model_disagreement</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+    <span class="c1">## Ground-truth for sanity checks.</span>
+    <span class="c1"># ground_truth_y = mutils.normal_dist(y, -50, 3)*0.5 + \</span>
+    <span class="c1">#                  mutils.normal_dist(y, 50, 3)*0.5</span>
+    <span class="n">p</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">is_unimodal</span> <span class="o">=</span> <span class="n">compute_multimodality_score</span><span class="p">(</span><span class="n">z</span><span class="p">)</span>
+    <span class="n">stats</span><span class="p">[</span><span class="s1">&#39;model&#39;</span><span class="p">][</span><span class="s1">&#39;multimodality&#39;</span><span class="p">][</span><span class="s1">&#39;p&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">p</span> <span class="c1">#TODO. take the smallest one?</span>
+    <span class="n">stats</span><span class="p">[</span><span class="s1">&#39;model&#39;</span><span class="p">][</span><span class="s1">&#39;multimodality&#39;</span><span class="p">][</span><span class="s1">&#39;d&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">d</span>
+    <span class="n">stats</span><span class="p">[</span><span class="s1">&#39;model&#39;</span><span class="p">][</span><span class="s1">&#39;multimodality&#39;</span><span class="p">][</span><span class="s1">&#39;isunimodal&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">is_unimodal</span>
+
+    <span class="c1">### Obtain statistics for the ground-truth.</span>
+    <span class="n">stats</span><span class="p">[</span><span class="s1">&#39;ground_truth&#39;</span><span class="p">][</span><span class="s1">&#39;mean&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">noise</span> <span class="o">==</span> <span class="s1">&#39;gaussian&#39;</span><span class="p">:</span>
+        <span class="n">stats</span><span class="p">[</span><span class="s1">&#39;ground_truth&#39;</span><span class="p">][</span><span class="s1">&#39;variance&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">gaussian_variance</span>
+        <span class="n">stats</span><span class="p">[</span><span class="s1">&#39;ground_truth&#39;</span><span class="p">][</span><span class="s1">&#39;entropy&#39;</span><span class="p">]</span> <span class="o">=</span> \
+                    <span class="mf">0.5</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">config</span><span class="o">.</span><span class="n">gaussian_variance</span><span class="p">)</span> <span class="o">+</span> <span class="mf">0.5</span>
+        <span class="n">stats</span><span class="p">[</span><span class="s1">&#39;ground_truth&#39;</span><span class="p">][</span><span class="s1">&#39;multimodality&#39;</span><span class="p">][</span><span class="s1">&#39;p&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span> <span class="c1">#TODO should we take 1 or 0</span>
+        <span class="n">stats</span><span class="p">[</span><span class="s1">&#39;ground_truth&#39;</span><span class="p">][</span><span class="s1">&#39;multimodality&#39;</span><span class="p">][</span><span class="s1">&#39;d&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">stats</span><span class="p">[</span><span class="s1">&#39;ground_truth&#39;</span><span class="p">][</span><span class="s1">&#39;multimodality&#39;</span><span class="p">][</span><span class="s1">&#39;isunimodal&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">elif</span> <span class="n">config</span><span class="o">.</span><span class="n">noise</span> <span class="o">==</span> <span class="s1">&#39;bimodal&#39;</span><span class="p">:</span>
+        <span class="c1"># The variance can be computed analytically according to:</span>
+        <span class="c1"># https://stats.stackexchange.com/questions/16608/what-is-the-variance-of-the-weighted-mixture-of-two-gaussians</span>
+        <span class="n">stats</span><span class="p">[</span><span class="s1">&#39;ground_truth&#39;</span><span class="p">][</span><span class="s1">&#39;variance&#39;</span><span class="p">]</span> <span class="o">=</span> \
+            <span class="mf">0.5</span><span class="o">*</span> <span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">gaussian_variance</span> <span class="o">+</span> <span class="n">config</span><span class="o">.</span><span class="n">gaussian_variance</span><span class="p">)</span> <span class="o">+</span> \
+            <span class="mf">0.25</span> <span class="o">*</span> <span class="p">(</span><span class="mi">50</span> <span class="o">-</span> <span class="p">(</span><span class="o">-</span><span class="mi">50</span><span class="p">))</span><span class="o">**</span><span class="mi">2</span>
+        <span class="c1"># WARNING! This is hardcoded as it need to be estimated from data.</span>
+        <span class="n">stats</span><span class="p">[</span><span class="s1">&#39;ground_truth&#39;</span><span class="p">][</span><span class="s1">&#39;entropy&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">3.20409</span>
+        <span class="n">stats</span><span class="p">[</span><span class="s1">&#39;ground_truth&#39;</span><span class="p">][</span><span class="s1">&#39;multimodality&#39;</span><span class="p">][</span><span class="s1">&#39;p&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">_alpha1</span>
+        <span class="n">stats</span><span class="p">[</span><span class="s1">&#39;ground_truth&#39;</span><span class="p">][</span><span class="s1">&#39;multimodality&#39;</span><span class="p">][</span><span class="s1">&#39;d&#39;</span><span class="p">]</span> <span class="o">=</span> \
+            <span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">_dist1</span> <span class="o">+</span> <span class="n">data</span><span class="o">.</span><span class="n">_dist2</span><span class="p">)</span><span class="o">/</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">_std1</span><span class="o">*</span><span class="n">data</span><span class="o">.</span><span class="n">_std2</span><span class="p">))</span>
+        <span class="n">stats</span><span class="p">[</span><span class="s1">&#39;ground_truth&#39;</span><span class="p">][</span><span class="s1">&#39;multimodality&#39;</span><span class="p">][</span><span class="s1">&#39;isunimodal&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="c1">### Store.</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">out_dir</span><span class="p">,</span> <span class="s1">&#39;uncertainty_stats.pickle&#39;</span><span class="p">),</span> <span class="s1">&#39;wb&#39;</span><span class="p">)</span> \
+                    <span class="k">as</span> <span class="n">handle</span><span class="p">:</span>
+        <span class="n">pickle</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">stats</span><span class="p">,</span> <span class="n">handle</span><span class="p">,</span> <span class="n">protocol</span><span class="o">=</span><span class="n">pickle</span><span class="o">.</span><span class="n">HIGHEST_PROTOCOL</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="compute_multimodality_score"><a class="viewcode-back" href="../../datasets.html#data.data_utils.compute_multimodality_score">[docs]</a><span class="k">def</span> <span class="nf">compute_multimodality_score</span><span class="p">(</span><span class="n">z</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Compute the uni-modality score of the predictive distribution.</span>
+
+<span class="sd">    Fits a mixture of two Gaussians to the input samples and </span>
+<span class="sd">    tests the resulting mixture for unimodality and </span>
+<span class="sd">    returns scores of unimodality.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        z (np.array): The predictions at the origin for different y values,</span>
+<span class="sd">            averaged across models.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        p (float): The mixing factor between the two Gaussians.</span>
+<span class="sd">        d (float): A score of the overlap between the two Gaussians.</span>
+<span class="sd">            The formula is given by: </span>
+<span class="sd">            ..math::</span>
+<span class="sd">                d = \frac{|\mu_1-\mu_2|}{2\sqrt{\sigma_1 \sigma_2}}</span>
+<span class="sd">        is_unimodal (bool): Whether the mixture is unimodal.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">gaussian_mixture</span> <span class="o">=</span> <span class="n">GaussianMixture</span><span class="p">(</span><span class="n">n_components</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">z</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">))</span>
+    <span class="n">mu1</span> <span class="o">=</span> <span class="n">gaussian_mixture</span><span class="o">.</span><span class="n">means_</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">mu2</span> <span class="o">=</span> <span class="n">gaussian_mixture</span><span class="o">.</span><span class="n">means_</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">sigma1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">gaussian_mixture</span><span class="o">.</span><span class="n">covariances_</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">sigma2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">gaussian_mixture</span><span class="o">.</span><span class="n">covariances_</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">gaussian_mixture</span><span class="o">.</span><span class="n">weights_</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">d</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">mu1</span><span class="o">-</span><span class="n">mu2</span><span class="p">)</span><span class="o">/</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">sigma1</span><span class="o">*</span><span class="n">sigma2</span><span class="p">))</span>
+    <span class="n">is_unimodal</span> <span class="o">=</span> <span class="n">d</span> <span class="o">&lt;=</span> <span class="mi">1</span>
+    <span class="n">is_unimodal</span> <span class="o">|=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="n">p</span><span class="p">)</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">p</span><span class="p">))</span> <span class="o">&gt;=</span> <span class="mi">2</span> <span class="o">*</span> \
+        <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">d</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">d</span><span class="o">**</span><span class="mi">2</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span> <span class="o">+</span> <span class="mi">2</span><span class="o">*</span><span class="n">d</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">d</span><span class="o">**</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">p</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">is_unimodal</span></div>
+
+<div class="viewcode-block" id="compute_model_disagreement"><a class="viewcode-back" href="../../datasets.html#data.data_utils.compute_model_disagreement">[docs]</a><span class="k">def</span> <span class="nf">compute_model_disagreement</span><span class="p">(</span><span class="n">params</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Compute the model disagreement.</span>
+
+<span class="sd">    The model disagreement is computed here as standard deviation of the</span>
+<span class="sd">    parameters of the likelihood averaged over the dimensionality of the space</span>
+<span class="sd">    to obtain a scalar. In the manuscript it is called $\mathcal{U}_V(x)$.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        params(torch.tensor): This are the parameters of the likelihood model. </span>
+<span class="sd">            - Mean for GLc</span>
+<span class="sd">            - Mean and variance concatenated for GL </span>
+<span class="sd">            - Weights for the Normalizing flow model </span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        (float): The model disagreement.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">md</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">md</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">regression_uncertainty_mm</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents of this repository:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../gaussian_likelihoods.html">Gaussian Likelihoods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../norm_flow.html">Normalizing Flows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../networks.html">Networks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic.html">Probabilistic</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../datasets.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../utils.html">Utilities</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2021, Maria R. Cervera, Rafael Daetwyler, Hamza Keurti, Francesco dAngelo, Christian Henning.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

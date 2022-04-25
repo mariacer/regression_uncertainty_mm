@@ -1,0 +1,31 @@
+.. _datasets-reference-label:
+
+Datasets
+********
+
+.. contents::
+
+This module contains all relevant functions to generate datasets.
+
+API
+===
+
+.. automodule:: data.regression1d_heteroscedastic_data
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+.. automodule:: data.regression2d_bimodal
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+.. automodule:: data.regression2d_gaussian
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+.. automodule:: data.data_utils
+    :members:
+    :undoc-members:
+    :show-inheritance:

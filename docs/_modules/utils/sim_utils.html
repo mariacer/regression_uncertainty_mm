@@ -1,0 +1,294 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>utils.sim_utils &#8212; regression_uncertainty_mm 0.1 documentation</title>
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for utils.sim_utils</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># Copyright 2021 Maria Cervera</span>
+<span class="c1">#</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#    http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+<span class="c1">#</span>
+<span class="c1"># @title          :utils/sim_utils.py</span>
+<span class="c1"># @author         :mc</span>
+<span class="c1"># @contact        :mariacer@ethz.ch</span>
+<span class="c1"># @created        :20/08/2021</span>
+<span class="c1"># @version        :1.0</span>
+<span class="c1"># @python_version :3.7.4</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Helper functions for simulations</span>
+<span class="sd">--------------------------------</span>
+
+<span class="sd">A collection of helper functions for simulations to keep other scripts clean.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">argparse</span> <span class="k">import</span> <span class="n">Namespace</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+
+<span class="n">_SUMMARY_KEYWORDS</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="c1"># The weird prefix &quot;aa_&quot; makes sure keywords appear first in the result csv.</span>
+    <span class="s1">&#39;aa_val_loss_final&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;aa_val_loss_lowest&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;aa_val_loss_lowest_epoch&#39;</span><span class="p">,</span>
+
+    <span class="s1">&#39;aa_test_loss_final&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;aa_test_loss_lowest&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;aa_test_loss_at_lowest_val&#39;</span><span class="p">,</span>
+
+    <span class="c1"># The following are only relevant for GL models.</span>
+    <span class="s1">&#39;aab_val_mse_final&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;aab_val_mse_lowest&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;aab_test_mse_final&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;aab_test_mse_lowest&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;aab_test_mse_at_lowest_val&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;aab_train_mse_final&#39;</span><span class="p">,</span>
+
+    <span class="s1">&#39;num_nans&#39;</span><span class="p">,</span>
+
+    <span class="s1">&#39;num_weights_main&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;num_weights_hyper&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;num_weights_ratio&#39;</span><span class="p">,</span>
+
+    <span class="c1"># Should be set in your program when the execution finished successfully.</span>
+    <span class="s1">&#39;finished&#39;</span>
+<span class="p">]</span>
+
+
+<div class="viewcode-block" id="setup_summary_dict"><a class="viewcode-back" href="../../utils.html#utils.sim_utils.setup_summary_dict">[docs]</a><span class="k">def</span> <span class="nf">setup_summary_dict</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">shared</span><span class="p">,</span> <span class="n">mnet</span><span class="p">,</span> <span class="n">hnet</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Setup the summary dictionary that is written to the performance</span>
+<span class="sd">    summary file (in the result folder).</span>
+
+<span class="sd">    This method adds the keyword &quot;summary&quot; to `shared`.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        config: Command-line arguments.</span>
+<span class="sd">        shared: Miscellaneous data shared among training functions (summary dict</span>
+<span class="sd">            will be added to this :class:`argparse.Namespace`).</span>
+<span class="sd">        mnet: Main network.</span>
+<span class="sd">        hnet (optional): Hypernetwork.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">summary</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+
+    <span class="n">mnum</span> <span class="o">=</span> <span class="n">mnet</span><span class="o">.</span><span class="n">num_params</span>
+
+    <span class="n">hnum</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="n">hm_ratio</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="k">if</span> <span class="n">hnet</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">hnum</span> <span class="o">=</span> <span class="n">hnet</span><span class="o">.</span><span class="n">num_params</span>
+        <span class="n">hm_ratio</span> <span class="o">=</span> <span class="n">hnum</span> <span class="o">/</span> <span class="n">mnum</span>
+
+    <span class="c1"># Note, we assume that all configs have the exact same keywords.</span>
+    <span class="n">summary_keys</span> <span class="o">=</span> <span class="n">_SUMMARY_KEYWORDS</span>
+
+    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">summary_keys</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;aa_val_loss_final&#39;</span><span class="p">,</span> <span class="s1">&#39;aa_val_loss_lowest&#39;</span><span class="p">,</span>
+                 <span class="s1">&#39;aa_val_loss_lowest_epoch&#39;</span><span class="p">,</span>
+                 <span class="s1">&#39;aa_test_loss_final&#39;</span><span class="p">,</span> <span class="s1">&#39;aa_test_loss_lowest&#39;</span><span class="p">,</span>
+                 <span class="s1">&#39;aa_test_loss_at_lowest_val&#39;</span><span class="p">,</span> <span class="s1">&#39;aab_test_mse_final&#39;</span><span class="p">,</span>
+                 <span class="s1">&#39;aab_val_mse_final&#39;</span><span class="p">,</span> <span class="s1">&#39;aab_val_mse_lowest&#39;</span><span class="p">,</span>
+                 <span class="s1">&#39;aab_test_mse_lowest&#39;</span><span class="p">,</span> <span class="s1">&#39;aab_test_mse_at_lowest_val&#39;</span><span class="p">,</span>
+                 <span class="s1">&#39;aab_train_mse_final&#39;</span><span class="p">]:</span>
+            <span class="n">summary</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="k">elif</span> <span class="n">k</span> <span class="o">==</span> <span class="s1">&#39;num_nans&#39;</span><span class="p">:</span>
+            <span class="n">summary</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">elif</span> <span class="n">k</span> <span class="o">==</span> <span class="s1">&#39;num_weights_main&#39;</span><span class="p">:</span>
+            <span class="n">summary</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">mnum</span>
+        <span class="k">elif</span> <span class="n">k</span> <span class="o">==</span> <span class="s1">&#39;num_weights_hyper&#39;</span><span class="p">:</span>
+            <span class="n">summary</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">hnum</span>
+        <span class="k">elif</span> <span class="n">k</span> <span class="o">==</span> <span class="s1">&#39;num_weights_ratio&#39;</span><span class="p">:</span>
+            <span class="n">summary</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">hm_ratio</span>
+        <span class="k">elif</span> <span class="n">k</span> <span class="o">==</span> <span class="s1">&#39;finished&#39;</span><span class="p">:</span>
+            <span class="n">summary</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Implementation must have changed if this exception is</span>
+            <span class="c1"># raised.</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Summary argument </span><span class="si">%s</span><span class="s1"> unknown!&#39;</span> <span class="o">%</span> <span class="n">k</span><span class="p">)</span>
+
+    <span class="n">shared</span><span class="o">.</span><span class="n">summary</span> <span class="o">=</span> <span class="n">summary</span></div>
+
+
+<div class="viewcode-block" id="save_summary_dict"><a class="viewcode-back" href="../../utils.html#utils.sim_utils.save_summary_dict">[docs]</a><span class="k">def</span> <span class="nf">save_summary_dict</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">shared</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Write a text file in the result folder that gives a quick</span>
+<span class="sd">    overview over the results achieved so far.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        (....): See docstring of function :func:`setup_summary_dict`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># &quot;setup_summary_dict&quot; must be called first.</span>
+    <span class="k">assert</span><span class="p">(</span><span class="nb">hasattr</span><span class="p">(</span><span class="n">shared</span><span class="p">,</span> <span class="s1">&#39;summary&#39;</span><span class="p">))</span>
+
+    <span class="n">summary_fn</span> <span class="o">=</span> <span class="s1">&#39;performance_overview.txt&#39;</span>
+    <span class="c1">#summary_fn = hpbbb._SUMMARY_FILENAME</span>
+
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">out_dir</span><span class="p">,</span> <span class="n">summary_fn</span><span class="p">),</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">shared</span><span class="o">.</span><span class="n">summary</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%s</span><span class="s1"> </span><span class="si">%s</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">utils</span><span class="o">.</span><span class="n">list_to_str</span><span class="p">(</span><span class="n">v</span><span class="p">)))</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="nb">float</span><span class="p">):</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%s</span><span class="s1"> </span><span class="si">%f</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">%s</span><span class="s1"> </span><span class="si">%d</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="backup_cli_command"><a class="viewcode-back" href="../../utils.html#utils.sim_utils.backup_cli_command">[docs]</a><span class="k">def</span> <span class="nf">backup_cli_command</span><span class="p">(</span><span class="n">config</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Write the curret CLI call into a script.</span>
+
+<span class="sd">    This will make it very easy to reproduce a run, by just copying the call</span>
+<span class="sd">    from the script in the output folder. However, this call might be ambiguous</span>
+<span class="sd">    in case default values have changed. In contrast, all default values are</span>
+<span class="sd">    backed up in the file ``config.json``.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        (....): See docstring of function :func:`setup_summary_dict`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">script_name</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">run_args</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+    <span class="n">command</span> <span class="o">=</span> <span class="s1">&#39;python3 &#39;</span> <span class="o">+</span> <span class="n">script_name</span>
+    <span class="c1"># FIXME Call reconstruction fails if user passed strings with white spaces.</span>
+    <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">run_args</span><span class="p">:</span>
+        <span class="n">command</span> <span class="o">+=</span> <span class="s1">&#39; &#39;</span> <span class="o">+</span> <span class="n">arg</span>
+
+    <span class="n">fn_script</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">out_dir</span><span class="p">,</span> <span class="s1">&#39;cli_call.sh&#39;</span><span class="p">)</span>
+
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">fn_script</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;#!/bin/sh</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;# The user invoked CLI call that caused the creation of</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s1">&#39;# this output folder.</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">command</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="setup_shared"><a class="viewcode-back" href="../../utils.html#utils.sim_utils.setup_shared">[docs]</a><span class="k">def</span> <span class="nf">setup_shared</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="n">mnet</span><span class="p">,</span> <span class="n">hnet</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Set up simple structure used to share data among functions.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        config: The experiment config.</span>
+<span class="sd">        device: The device.</span>
+<span class="sd">        mnet: The main network.</span>
+<span class="sd">        hnet: The (optional) hypernetwork.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        (Namespace): The shared structure.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Detect network where Bayesian stats might be applied.</span>
+    <span class="n">net</span> <span class="o">=</span> <span class="n">mnet</span>
+    <span class="k">if</span> <span class="n">hnet</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">net</span> <span class="o">=</span> <span class="n">hnet</span>
+
+    <span class="n">shared</span> <span class="o">=</span>  <span class="n">Namespace</span><span class="p">()</span>
+
+    <span class="c1"># Mean and variance of prior that is used for variational inference.</span>
+    <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">mean_only</span><span class="p">:</span> <span class="c1"># No prior-matching can be performed.</span>
+        <span class="n">shared</span><span class="o">.</span><span class="n">prior_mean</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">shared</span><span class="o">.</span><span class="n">prior_logvar</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">shared</span><span class="o">.</span><span class="n">prior_std</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">plogvar</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">prior_variance</span><span class="p">)</span>
+        <span class="n">pstd</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">prior_variance</span><span class="p">)</span>
+        <span class="n">shared</span><span class="o">.</span><span class="n">prior_mean</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="o">*</span><span class="n">s</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span> \
+                             <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">net</span><span class="o">.</span><span class="n">orig_param_shapes</span><span class="p">]</span>
+        <span class="n">shared</span><span class="o">.</span><span class="n">prior_logvar</span> <span class="o">=</span> <span class="p">[</span><span class="n">plogvar</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="o">*</span><span class="n">s</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span> \
+                               <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">net</span><span class="o">.</span><span class="n">orig_param_shapes</span><span class="p">]</span>
+        <span class="n">shared</span><span class="o">.</span><span class="n">prior_std</span> <span class="o">=</span> <span class="p">[</span><span class="n">pstd</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="o">*</span><span class="n">s</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span> \
+                            <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">net</span><span class="o">.</span><span class="n">orig_param_shapes</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">shared</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">regression_uncertainty_mm</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents of this repository:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../gaussian_likelihoods.html">Gaussian Likelihoods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../norm_flow.html">Normalizing Flows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../networks.html">Networks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic.html">Probabilistic</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../datasets.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../utils.html">Utilities</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2021, Maria R. Cervera, Rafael Daetwyler, Hamza Keurti, Francesco dAngelo, Christian Henning.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

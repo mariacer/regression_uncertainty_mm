@@ -1,0 +1,333 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>normalizing_flows.simple_regression.simple_flow &#8212; regression_uncertainty_mm 0.1 documentation</title>
+    <link rel="stylesheet" href="../../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for normalizing_flows.simple_regression.simple_flow</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># Copyright 2021 Maria Cervera</span>
+
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#    http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+<span class="c1">#</span>
+<span class="c1"># @title          :normalizing_flows/simple_regression/simple_flow.py</span>
+<span class="c1"># @author         :mc</span>
+<span class="c1"># @contact        :mariacer@ethz.ch</span>
+<span class="c1"># @created        :24/08/2021</span>
+<span class="c1"># @version        :1.0</span>
+<span class="c1"># @python_version :3.7.4</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Simple normalizing flow for 1D regression experiments</span>
+<span class="sd">-----------------------------------------------------</span>
+
+<span class="sd">Original code by Francesco d&#39;Angelo and Rafael Daetwyler. </span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">hypnettorch.mnets.mlp</span> <span class="k">import</span> <span class="n">MLP</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torch.nn</span> <span class="k">as</span> <span class="nn">nn</span>
+
+<span class="kn">from</span> <span class="nn">normalizing_flows.simple_regression.diffeomorphisms.leaky_relu</span> <span class="k">import</span> \
+    <span class="n">LeakyReLU</span>
+<span class="kn">from</span> <span class="nn">normalizing_flows.simple_regression.diffeomorphisms.log_transform</span> <span class="k">import</span> \
+    <span class="n">LogTransform</span>
+<span class="kn">from</span> <span class="nn">normalizing_flows.simple_regression.layers.perceptron</span> <span class="k">import</span> <span class="n">Perceptron</span>
+<span class="kn">from</span> <span class="nn">normalizing_flows.simple_regression.layers.splines</span> <span class="k">import</span> \
+    <span class="n">PiecewiseRationalQuadraticCDF</span>
+
+<div class="viewcode-block" id="SimpleFlow"><a class="viewcode-back" href="../../../norm_flow.html#normalizing_flows.simple_regression.simple_flow.SimpleFlow">[docs]</a><span class="k">class</span> <span class="nc">SimpleFlow</span><span class="p">(</span><span class="n">MLP</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Implementation of an MLP-based normalizing flow.</span>
+
+<span class="sd">    This is a normalizing flow based on a simple fully-connected network, that</span>
+<span class="sd">    receives input vector :math:`\mathbf{t}` and outputs a vector</span>
+<span class="sd">    :math:`\mathbf{u}` of real values.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        depth (int): The depth (number of layers) of the flow.</span>
+<span class="sd">        dimensionality (int): The dimensionality of the inputs and outputs.</span>
+<span class="sd">        layers (str): The type of layer to be used.</span>
+<span class="sd">        activation_fn: The nonlinearity used in hidden layers. If ``None``, no</span>
+<span class="sd">            nonlinearity will be applied.</span>
+<span class="sd">        use_bias (bool): Whether layers may have bias terms.</span>
+<span class="sd">        in_fn (optional): If provided, this function will be applied to the</span>
+<span class="sd">            input neurons of the network.</span>
+<span class="sd">        out_fn (optional): If provided, this function will be applied to the</span>
+<span class="sd">            output neurons of the network.</span>
+
+<span class="sd">            Warning:</span>
+<span class="sd">                This changes the interpretation of the output of the</span>
+<span class="sd">                :meth:`forward` method.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">depth</span><span class="p">,</span> <span class="n">dimensionality</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">layers</span><span class="o">=</span><span class="s1">&#39;perceptron&#39;</span><span class="p">,</span>
+                 <span class="n">activation_fn</span><span class="o">=</span><span class="n">LeakyReLU</span><span class="p">,</span> <span class="n">use_bias</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">in_fn</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                 <span class="n">out_fn</span><span class="o">=</span><span class="n">LogTransform</span><span class="p">,</span> <span class="n">spline_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="c1"># TODO: inherit directly from MainNetInterface instead of MLP,</span>
+        <span class="c1"># as we don&#39;t need most of the stuff from MLP</span>
+
+        <span class="c1"># Note, I suspect this activation_fn input isn&#39;t used, as the forward</span>
+        <span class="c1"># method is overwritten.</span>
+        <span class="n">MLP</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hidden_layers</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">*</span><span class="n">depth</span><span class="p">,</span> <span class="n">activation_fn</span><span class="o">=</span><span class="n">activation_fn</span><span class="p">,</span>
+                     <span class="n">use_bias</span><span class="o">=</span><span class="n">use_bias</span><span class="p">,</span> <span class="n">no_weights</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">out_fn</span><span class="o">=</span><span class="n">out_fn</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">dimensionality</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_depth</span> <span class="o">=</span> <span class="n">depth</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span> <span class="o">=</span> <span class="n">kwargs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_in_fn</span> <span class="o">=</span> <span class="n">in_fn</span>
+
+        <span class="k">if</span> <span class="n">layers</span> <span class="o">==</span> <span class="s1">&#39;splines&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_layer</span> <span class="o">=</span> <span class="n">PiecewiseRationalQuadraticCDF</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="n">dimensionality</span><span class="p">,</span>
+                                                        <span class="n">tails</span><span class="o">=</span><span class="s1">&#39;linear&#39;</span><span class="p">,</span>
+                                                        <span class="n">tail_bound</span><span class="o">=</span><span class="n">spline_bound</span><span class="p">)</span>
+            <span class="c1"># TODO: other properties besides param_shapes should also be changed</span>
+            <span class="c1"># also, think of changing the parent class</span>
+            <span class="n">single_shapes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_layer</span><span class="o">.</span><span class="n">get_param_shapes</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_param_shapes</span> <span class="o">=</span> <span class="p">[</span><span class="n">shape</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_depth</span><span class="p">)</span> \
+                                  <span class="k">for</span> <span class="n">shape</span> <span class="ow">in</span> <span class="n">single_shapes</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_param_shapes_meta</span> <span class="o">=</span> <span class="p">[</span>\
+                                    <span class="p">{</span><span class="s1">&#39;name&#39;</span><span class="p">:</span> <span class="s1">&#39;weight&#39;</span><span class="p">,</span> <span class="s1">&#39;index&#39;</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;layer&#39;</span><span class="p">:</span> <span class="n">i</span><span class="p">}</span>
+                                    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_depth</span><span class="p">)</span>
+                                    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">single_shapes</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_hyper_shapes_learned</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_param_shapes</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_a_fun</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">elif</span> <span class="n">layers</span> <span class="o">==</span> <span class="s1">&#39;perceptron&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_layer</span> <span class="o">=</span> <span class="n">Perceptron</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s1">&#39;Layer type &#39;</span><span class="o">+</span><span class="n">layers</span><span class="o">+</span><span class="s1">&#39; not implemented!&#39;</span><span class="p">)</span>
+
+        <span class="c1"># Define the base distribution p(u).</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_p0</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">distributions</span><span class="o">.</span><span class="n">normal</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">0.0</span><span class="p">]),</span> \
+                                                     <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">1.0</span><span class="p">]))</span>
+
+<div class="viewcode-block" id="SimpleFlow.forward"><a class="viewcode-back" href="../../../norm_flow.html#normalizing_flows.simple_regression.simple_flow.SimpleFlow.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">weights</span><span class="p">,</span> <span class="n">preprocessed</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Forward pass through the flow.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            t (torch.Tensor): The inputs to the flow.</span>
+<span class="sd">            weights (torch.Tensor): The weights of the flow.</span>
+<span class="sd">            preprocessed: Whether the weights have been preprocessed.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (tuple): Tuple containing:</span>
+
+<span class="sd">            - **u**: The output of the flow.</span>
+<span class="sd">            - **logabsdet**: The absolute value of the log of the Jacobian of</span>
+<span class="sd">                the flow.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">preprocessed</span><span class="p">:</span>
+            <span class="k">assert</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">weights</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">t</span><span class="p">))</span>
+            <span class="n">weights</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_layer</span><span class="o">.</span><span class="n">preprocess_weights</span><span class="p">(</span><span class="n">weights</span><span class="p">)</span>
+
+        <span class="n">hidden</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">squeeze</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+
+        <span class="c1"># input layer</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_in_fn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">context</span> <span class="o">=</span> <span class="p">[</span><span class="n">weights</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_in_fn</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span><span class="p">]</span>
+            <span class="n">hidden</span><span class="p">,</span> <span class="n">logabsdet</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_layer</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">hidden</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+
+        <span class="c1"># hidden layers</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_depth</span><span class="p">):</span>
+            <span class="n">context</span> <span class="o">=</span> <span class="p">[</span><span class="n">weights</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_a_fun</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span><span class="p">]</span>
+            <span class="n">hidden</span><span class="p">,</span> <span class="n">temp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_layer</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">hidden</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+            <span class="n">logabsdet</span> <span class="o">=</span> <span class="n">logabsdet</span> <span class="o">+</span> <span class="n">temp</span> <span class="k">if</span> <span class="s1">&#39;logabsdet&#39;</span> <span class="ow">in</span> <span class="nb">locals</span><span class="p">()</span> <span class="k">else</span> <span class="n">temp</span>
+
+        <span class="c1"># output layer</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_out_fn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">context</span> <span class="o">=</span> <span class="p">[</span><span class="n">weights</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_depth</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_out_fn</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span><span class="p">]</span>
+            <span class="n">hidden</span><span class="p">,</span> <span class="n">temp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_layer</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">hidden</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+            <span class="n">logabsdet</span> <span class="o">+=</span> <span class="n">temp</span>
+
+        <span class="n">u</span> <span class="o">=</span> <span class="n">hidden</span>
+
+        <span class="k">return</span> <span class="n">u</span><span class="p">,</span> <span class="n">logabsdet</span></div>
+
+<div class="viewcode-block" id="SimpleFlow.inverse"><a class="viewcode-back" href="../../../norm_flow.html#normalizing_flows.simple_regression.simple_flow.SimpleFlow.inverse">[docs]</a>    <span class="k">def</span> <span class="nf">inverse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">weights</span><span class="p">,</span> <span class="n">preprocessed</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Inverse pass through the flow.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            (....): See docstring of method :func:`forward`.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (....): See docstring of method :func:`forward`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">preprocessed</span><span class="p">:</span>
+            <span class="k">assert</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">weights</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">u</span><span class="p">))</span>
+            <span class="n">weights</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_layer</span><span class="o">.</span><span class="n">preprocess_weights</span><span class="p">(</span><span class="n">weights</span><span class="p">)</span>
+
+        <span class="n">hidden</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">squeeze</span><span class="p">(</span><span class="n">u</span><span class="p">)</span>
+
+        <span class="c1"># output layer</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_out_fn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">context</span> <span class="o">=</span> <span class="p">[</span><span class="n">weights</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_depth</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_out_fn</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span><span class="p">]</span>
+            <span class="n">hidden</span><span class="p">,</span> <span class="n">logabsdet</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_layer</span><span class="o">.</span><span class="n">inverse</span><span class="p">(</span><span class="n">hidden</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+
+        <span class="c1"># hidden layers</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_depth</span><span class="p">)):</span>
+            <span class="n">context</span> <span class="o">=</span> <span class="p">[</span><span class="n">weights</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_a_fun</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span><span class="p">]</span>
+            <span class="n">hidden</span><span class="p">,</span> <span class="n">temp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_layer</span><span class="o">.</span><span class="n">inverse</span><span class="p">(</span><span class="n">hidden</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+            <span class="n">logabsdet</span> <span class="o">=</span> <span class="n">logabsdet</span> <span class="o">+</span> <span class="n">temp</span> <span class="k">if</span> <span class="s1">&#39;logabsdet&#39;</span> <span class="ow">in</span> <span class="nb">locals</span><span class="p">()</span> <span class="k">else</span> <span class="n">temp</span>
+
+        <span class="c1"># input layer</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_in_fn</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">context</span> <span class="o">=</span> <span class="p">[</span><span class="n">weights</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_in_fn</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_kwargs</span><span class="p">]</span>
+            <span class="n">hidden</span><span class="p">,</span> <span class="n">temp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_layer</span><span class="o">.</span><span class="n">inverse</span><span class="p">(</span><span class="n">hidden</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+            <span class="n">logabsdet</span> <span class="o">+=</span> <span class="n">temp</span>
+
+        <span class="n">y</span> <span class="o">=</span> <span class="n">hidden</span>
+
+        <span class="k">return</span> <span class="n">y</span><span class="p">,</span> <span class="n">logabsdet</span></div>
+
+<div class="viewcode-block" id="SimpleFlow.log_p0"><a class="viewcode-back" href="../../../norm_flow.html#normalizing_flows.simple_regression.simple_flow.SimpleFlow.log_p0">[docs]</a>    <span class="k">def</span> <span class="nf">log_p0</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">u</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Compute the log of the probability of the input.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            u (torch.Tensor): The sample for which to evaluate the probability.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (float): The probability.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_p0</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">u</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="SimpleFlow.sample_p0"><a class="viewcode-back" href="../../../norm_flow.html#normalizing_flows.simple_regression.simple_flow.SimpleFlow.sample_p0">[docs]</a>    <span class="k">def</span> <span class="nf">sample_p0</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Same from the base distribution.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            n (int): The number of samples to get.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (torch.Tensor): The samples.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="n">n</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">Size</span><span class="p">([</span><span class="n">n</span><span class="p">])</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_p0</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">n</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="SimpleFlow.get_max_deviation"><a class="viewcode-back" href="../../../norm_flow.html#normalizing_flows.simple_regression.simple_flow.SimpleFlow.get_max_deviation">[docs]</a>    <span class="k">def</span> <span class="nf">get_max_deviation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">weights</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Get maximum deviation between forward and backward passes.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            x (torch.Tensor): The forward inputs.</span>
+<span class="sd">            weights: The weights of the layer.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (float): The maximum absolute deviation across the batch.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">forwardPass</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">weights</span><span class="p">)</span>
+        <span class="n">inversePass</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">inverse</span><span class="p">(</span><span class="n">forwardPass</span><span class="p">,</span> <span class="n">weights</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()</span> <span class="o">-</span> <span class="n">inversePass</span><span class="p">))</span><span class="o">.</span><span class="n">item</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="SimpleFlow.to"><a class="viewcode-back" href="../../../norm_flow.html#normalizing_flows.simple_regression.simple_flow.SimpleFlow.to">[docs]</a>    <span class="k">def</span> <span class="nf">to</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Move model to specific device.&quot;&quot;&quot;</span>
+        <span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="s1">&#39;device&#39;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="n">device</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;device&#39;</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">):</span>
+            <span class="n">device</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+        <span class="n">loc</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_p0</span><span class="o">.</span><span class="n">loc</span>
+        <span class="n">scale</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_p0</span><span class="o">.</span><span class="n">scale</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_p0</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">distributions</span><span class="o">.</span><span class="n">normal</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="n">loc</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">),</span> \
+                                                     <span class="n">scale</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">))</span>
+        <span class="k">return</span> <span class="bp">self</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../index.html">regression_uncertainty_mm</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents of this repository:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../gaussian_likelihoods.html">Gaussian Likelihoods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../norm_flow.html">Normalizing Flows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../networks.html">Networks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../probabilistic.html">Probabilistic</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../datasets.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../utils.html">Utilities</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2021, Maria R. Cervera, Rafael Daetwyler, Hamza Keurti, Francesco dAngelo, Christian Henning.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

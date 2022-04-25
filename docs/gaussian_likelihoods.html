@@ -1,0 +1,531 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Regression experiments with Gaussian Likelihoods &#8212; regression_uncertainty_mm 0.1 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Normalizing Flows" href="norm_flow.html" />
+    <link rel="prev" title="Welcome to regression_uncertainty_mm’s documentation!" href="index.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="regression-experiments-with-gaussian-likelihoods">
+<span id="gaussian-likelihoods-reference-label"></span><h1><a class="toc-backref" href="#id11">Regression experiments with Gaussian Likelihoods</a><a class="headerlink" href="#regression-experiments-with-gaussian-likelihoods" title="Permalink to this headline">¶</a></h1>
+<div class="contents topic" id="contents">
+<p class="topic-title first">Contents</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#regression-experiments-with-gaussian-likelihoods" id="id11">Regression experiments with Gaussian Likelihoods</a></p>
+<ul>
+<li><p><a class="reference internal" href="#general-notes" id="id12">General Notes</a></p>
+<ul>
+<li><p><a class="reference internal" href="#unimodal-1d-toy-experiments" id="id13">Unimodal 1D Toy Experiments</a></p>
+<ul>
+<li><p><a class="reference internal" href="#deterministic-gaussian-likelihood-homoscedastic-noise" id="id14">Deterministic Gaussian Likelihood (homoscedastic noise)</a></p></li>
+<li><p><a class="reference internal" href="#deterministic-gaussian-likelihood-heteroscedastic-noise" id="id15">Deterministic Gaussian Likelihood (heteroscedastic noise)</a></p></li>
+<li><p><a class="reference internal" href="#gaussian-likelihood-with-bbb-homoscedastic-noise" id="id16">Gaussian Likelihood with BbB(homoscedastic noise)</a></p></li>
+<li><p><a class="reference internal" href="#gaussian-likelihood-with-bbb-heteroscedastic-noise" id="id17">Gaussian Likelihood with BbB (heteroscedastic noise)</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#bimodal-1d-toy-experiments" id="id18">Bimodal 1D Toy Experiments</a></p>
+<ul>
+<li><p><a class="reference internal" href="#id1" id="id19">Deterministic Gaussian Likelihood (homoscedastic noise)</a></p></li>
+<li><p><a class="reference internal" href="#id2" id="id20">Deterministic Gaussian Likelihood (heteroscedastic noise)</a></p></li>
+<li><p><a class="reference internal" href="#id3" id="id21">Gaussian Likelihood with BbB(homoscedastic noise)</a></p></li>
+<li><p><a class="reference internal" href="#id4" id="id22">Gaussian Likelihood with BbB (heteroscedastic noise)</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#bimodal-2d-toy-experiments" id="id23">Bimodal 2D Toy Experiments</a></p>
+<ul>
+<li><p><a class="reference internal" href="#id5" id="id24">Deterministic Gaussian Likelihood (homoscedastic noise)</a></p></li>
+<li><p><a class="reference internal" href="#id6" id="id25">Deterministic Gaussian Likelihood (heteroscedastic noise)</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#steering-angle-prediction-experiments" id="id26">Steering Angle Prediction Experiments</a></p>
+<ul>
+<li><p><a class="reference internal" href="#id7" id="id27">Deterministic Gaussian Likelihood (homoscedastic noise)</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#id8" id="id28">Steering Angle Prediction Experiments</a></p>
+<ul>
+<li><p><a class="reference internal" href="#id9" id="id29">Deterministic Gaussian Likelihood (homoscedastic noise)</a></p></li>
+<li><p><a class="reference internal" href="#id10" id="id30">Deterministic Gaussian Likelihood (heteroscedastic noise)</a></p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#module-gaussian_likelihoods.train_utils" id="id31">API</a></p>
+<ul>
+<li><p><a class="reference internal" href="#helper-functions-for-training" id="id32">Helper functions for training</a></p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+<p>This module contains all relevant functions to run experiments with Gaussian likelihood models.</p>
+<div class="section" id="general-notes">
+<h2><a class="toc-backref" href="#id12">General Notes</a><a class="headerlink" href="#general-notes" title="Permalink to this headline">¶</a></h2>
+<p>Performing regression experiments with Gaussian likelihood models. Two possibilities are considered:</p>
+<ul class="simple">
+<li><p><strong>Homoscedastic variance</strong>: The model only generates the input-dependent mean, and the variance is constant across inputs and preset. It is given by the command line argument <code class="docutils literal notranslate"><span class="pre">--pred_dist_std</span></code>. These experiments can be run using the script <code class="docutils literal notranslate"><span class="pre">train_gl.py</span></code>.</p></li>
+<li><p><strong>Heteroscedastic variance</strong>: The model generates both an input-dependent mean and an input-dependent variance.  These experiments can be run using the script <code class="docutils literal notranslate"><span class="pre">train_ghl.py</span></code>.</p></li>
+</ul>
+<p>Note that the models generated are Bayesian by default. However, a deterministic model can be used by setting the option <code class="docutils literal notranslate"><span class="pre">--mean_only</span></code>.</p>
+<p>Furthermore, regression can be done using one of two toy regression datasets based on a cubic polynomial. In the basic setting, a polynomial with a single mode is generated. However if desired a bimodal distribution can be used by setting the option <code class="docutils literal notranslate"><span class="pre">--noise=bimodal</span></code>.</p>
+<div class="section" id="unimodal-1d-toy-experiments">
+<h3><a class="toc-backref" href="#id13">Unimodal 1D Toy Experiments</a><a class="headerlink" href="#unimodal-1d-toy-experiments" title="Permalink to this headline">¶</a></h3>
+<p>Please run the following command to see the available options for running 1D toy experiments.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_gl.py --help
+</pre></div>
+</div>
+<div class="section" id="deterministic-gaussian-likelihood-homoscedastic-noise">
+<h4><a class="toc-backref" href="#id14">Deterministic Gaussian Likelihood (homoscedastic noise)</a><a class="headerlink" href="#deterministic-gaussian-likelihood-homoscedastic-noise" title="Permalink to this headline">¶</a></h4>
+<p>The following run achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_gl.py --kl_scale<span class="o">=</span><span class="m">0</span> --train_sample_size<span class="o">=</span><span class="m">1</span> --val_sample_size<span class="o">=</span><span class="m">1</span> --n_iter<span class="o">=</span><span class="m">20001</span> --lr<span class="o">=</span><span class="m">0</span>.0001 --mlp_arch<span class="o">=</span><span class="m">50</span>,50 --net_act<span class="o">=</span>relu --val_iter<span class="o">=</span><span class="m">1000</span> --num_train<span class="o">=</span><span class="m">20</span> --mean_only --noise<span class="o">=</span>gaussian
+</pre></div>
+</div>
+</div>
+<div class="section" id="deterministic-gaussian-likelihood-heteroscedastic-noise">
+<h4><a class="toc-backref" href="#id15">Deterministic Gaussian Likelihood (heteroscedastic noise)</a><a class="headerlink" href="#deterministic-gaussian-likelihood-heteroscedastic-noise" title="Permalink to this headline">¶</a></h4>
+<p>The following run achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_ghl.py --kl_scale<span class="o">=</span><span class="m">0</span> --train_sample_size<span class="o">=</span><span class="m">1</span> --val_sample_size<span class="o">=</span><span class="m">1</span> --batch_size<span class="o">=</span><span class="m">32</span> --n_iter<span class="o">=</span><span class="m">20001</span> --lr<span class="o">=</span><span class="m">0</span>.0001 --mlp_arch<span class="o">=</span><span class="m">100</span>,100 --net_act<span class="o">=</span>sigmoid --val_iter<span class="o">=</span><span class="m">1000</span> --num_train<span class="o">=</span><span class="m">20</span> --mean_only --noise<span class="o">=</span>gaussian
+</pre></div>
+</div>
+</div>
+<div class="section" id="gaussian-likelihood-with-bbb-homoscedastic-noise">
+<h4><a class="toc-backref" href="#id16">Gaussian Likelihood with BbB(homoscedastic noise)</a><a class="headerlink" href="#gaussian-likelihood-with-bbb-homoscedastic-noise" title="Permalink to this headline">¶</a></h4>
+<p>The following run achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_gl.py --n_iter<span class="o">=</span><span class="m">20001</span> --lr<span class="o">=</span><span class="m">0</span>.01 --train_sample_size<span class="o">=</span><span class="m">10</span> --mlp_arch<span class="o">=</span><span class="m">10</span>,10 --net_act<span class="o">=</span>relu --val_iter<span class="o">=</span><span class="m">1000</span> --val_sample_size<span class="o">=</span><span class="m">100</span> --num_train<span class="o">=</span><span class="m">20</span> --noise<span class="o">=</span>gaussian
+</pre></div>
+</div>
+</div>
+<div class="section" id="gaussian-likelihood-with-bbb-heteroscedastic-noise">
+<h4><a class="toc-backref" href="#id17">Gaussian Likelihood with BbB (heteroscedastic noise)</a><a class="headerlink" href="#gaussian-likelihood-with-bbb-heteroscedastic-noise" title="Permalink to this headline">¶</a></h4>
+<p>The following run achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_ghl.py --batch_size<span class="o">=</span><span class="m">16</span> --n_iter<span class="o">=</span><span class="m">20001</span> --lr<span class="o">=</span><span class="m">0</span>.001 --train_sample_size<span class="o">=</span><span class="m">1</span> --prior_variance<span class="o">=</span><span class="m">1</span>.0 --kl_scale<span class="o">=</span><span class="m">0</span>.01 --mlp_arch<span class="o">=</span><span class="m">100</span> --net_act<span class="o">=</span>relu --val_iter<span class="o">=</span><span class="m">1000</span> --val_sample_size<span class="o">=</span><span class="m">100</span> --num_train<span class="o">=</span><span class="m">20</span> --noise<span class="o">=</span>gaussian
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="bimodal-1d-toy-experiments">
+<h3><a class="toc-backref" href="#id18">Bimodal 1D Toy Experiments</a><a class="headerlink" href="#bimodal-1d-toy-experiments" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id1">
+<h4><a class="toc-backref" href="#id19">Deterministic Gaussian Likelihood (homoscedastic noise)</a><a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h4>
+<p>The following run with <strong>20 training points</strong> achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_gl.py --kl_scale<span class="o">=</span><span class="m">0</span> --train_sample_size<span class="o">=</span><span class="m">1</span> --val_sample_size<span class="o">=</span><span class="m">1</span> --n_iter<span class="o">=</span><span class="m">20001</span> --lr<span class="o">=</span><span class="m">0</span>.01 --mlp_arch<span class="o">=</span><span class="m">20</span>,20,20 --net_act<span class="o">=</span>sigmoid --val_iter<span class="o">=</span><span class="m">1000</span> --num_train<span class="o">=</span><span class="m">20</span> --mean_only --noise<span class="o">=</span>bimodal
+</pre></div>
+</div>
+<p>The following run with <strong>50 training points</strong> achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_gl.py --kl_scale<span class="o">=</span><span class="m">0</span> --train_sample_size<span class="o">=</span><span class="m">1</span> --val_sample_size<span class="o">=</span><span class="m">1</span> --batch_size<span class="o">=</span><span class="m">32</span> --n_iter<span class="o">=</span><span class="m">20001</span> --lr<span class="o">=</span>1e-05 --mlp_arch<span class="o">=</span><span class="m">100</span>,100 --net_act<span class="o">=</span>relu --val_iter<span class="o">=</span><span class="m">1000</span> --num_train<span class="o">=</span><span class="m">50</span> --mean_only --noise<span class="o">=</span>bimodal
+</pre></div>
+</div>
+<p>The following run with <strong>1000 training points</strong> achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_gl.py --kl_scale<span class="o">=</span><span class="m">0</span> --train_sample_size<span class="o">=</span><span class="m">1</span> --val_sample_size<span class="o">=</span><span class="m">1</span> --n_iter<span class="o">=</span><span class="m">4001</span> --lr<span class="o">=</span><span class="m">0</span>.01 --mlp_arch<span class="o">=</span><span class="m">20</span>,20,20 --net_act<span class="o">=</span>sigmoid --val_iter<span class="o">=</span><span class="m">1000</span> --num_train<span class="o">=</span><span class="m">1000</span> --mean_only --noise<span class="o">=</span>bimodal
+</pre></div>
+</div>
+<p>The following run with <strong>1000 training points</strong> and ground-truth predictive variance achieves lowest negative log-likelihood on the validation set for this model:</p>
+<blockquote>
+<div><p>python3 train_gl.py –kl_scale=0 –train_sample_size=1 –val_sample_size=1 –n_iter=1001 –lr=0.01 –pred_dist_std=50.08991914547278 –mlp_arch=20,20,20 –net_act=sigmoid –val_iter=1000 –num_train=1000 –mean_only –noise=bimodal</p>
+</div></blockquote>
+</div>
+<div class="section" id="id2">
+<h4><a class="toc-backref" href="#id20">Deterministic Gaussian Likelihood (heteroscedastic noise)</a><a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h4>
+<p>The following run with <strong>20 training points</strong> achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_ghl.py --kl_scale<span class="o">=</span><span class="m">0</span> --train_sample_size<span class="o">=</span><span class="m">1</span> --val_sample_size<span class="o">=</span><span class="m">1</span> --n_iter<span class="o">=</span><span class="m">10001</span> --lr<span class="o">=</span><span class="m">0</span>.001 --mlp_arch<span class="o">=</span><span class="m">20</span>,20,20 --net_act<span class="o">=</span>relu --val_iter<span class="o">=</span><span class="m">1000</span> --num_train<span class="o">=</span><span class="m">20</span> --mean_only --noise<span class="o">=</span>bimodal
+</pre></div>
+</div>
+<p>The following run with <strong>50 training points</strong> achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_ghl.py --kl_scale<span class="o">=</span><span class="m">0</span> --train_sample_size<span class="o">=</span><span class="m">1</span> --val_sample_size<span class="o">=</span><span class="m">1</span> --n_iter<span class="o">=</span><span class="m">10001</span> --lr<span class="o">=</span><span class="m">0</span>.001 --mlp_arch<span class="o">=</span><span class="m">50</span>,50 --net_act<span class="o">=</span>relu --val_iter<span class="o">=</span><span class="m">1000</span> --num_train<span class="o">=</span><span class="m">50</span> --mean_only --noise<span class="o">=</span>bimodal --publication_style
+</pre></div>
+</div>
+<p>The following run with <strong>1000 training points</strong> achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_ghl.py --kl_scale<span class="o">=</span><span class="m">0</span> --train_sample_size<span class="o">=</span><span class="m">1</span> --val_sample_size<span class="o">=</span><span class="m">1</span> --n_iter<span class="o">=</span><span class="m">5001</span> --lr<span class="o">=</span><span class="m">0</span>.01 --mlp_arch<span class="o">=</span><span class="m">20</span>,20,20 --net_act<span class="o">=</span>relu --val_iter<span class="o">=</span><span class="m">1000</span> --num_train<span class="o">=</span><span class="m">1000</span> --mean_only --noise<span class="o">=</span>bimodal
+</pre></div>
+</div>
+</div>
+<div class="section" id="id3">
+<h4><a class="toc-backref" href="#id21">Gaussian Likelihood with BbB(homoscedastic noise)</a><a class="headerlink" href="#id3" title="Permalink to this headline">¶</a></h4>
+<p>The following run with <strong>20 training points</strong> achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_gl.py --n_iter<span class="o">=</span><span class="m">10001</span> --lr<span class="o">=</span><span class="m">0</span>.01 --train_sample_size<span class="o">=</span><span class="m">1</span> --mlp_arch<span class="o">=</span><span class="m">50</span>,50 --net_act<span class="o">=</span>relu --val_iter<span class="o">=</span><span class="m">1000</span> --val_sample_size<span class="o">=</span><span class="m">100</span> --num_train<span class="o">=</span><span class="m">20</span> --noise<span class="o">=</span>bimodal
+</pre></div>
+</div>
+<p>The following run with <strong>50 training points</strong> achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_gl.py --disable_lrt_test --batch_size<span class="o">=</span><span class="m">32</span> --n_iter<span class="o">=</span><span class="m">10001</span> --lr<span class="o">=</span><span class="m">0</span>.0001 --train_sample_size<span class="o">=</span><span class="m">1</span> --prior_variance<span class="o">=</span><span class="m">1</span>.0 --local_reparam_trick --kl_scale<span class="o">=</span><span class="m">1</span>.0 --mlp_arch<span class="o">=</span><span class="m">100</span> --net_act<span class="o">=</span>relu --val_iter<span class="o">=</span><span class="m">1000</span> --val_sample_size<span class="o">=</span><span class="m">100</span> --num_train<span class="o">=</span><span class="m">50</span> --noise<span class="o">=</span>bimodal --publication_style
+</pre></div>
+</div>
+<p>The following run with <strong>1000 training points</strong> achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_gl.py --disable_lrt_test --n_iter<span class="o">=</span><span class="m">3001</span> --lr<span class="o">=</span><span class="m">0</span>.01 --train_sample_size<span class="o">=</span><span class="m">20</span> --local_reparam_trick --mlp_arch<span class="o">=</span><span class="m">20</span>,20,20 --net_act<span class="o">=</span>relu --val_iter<span class="o">=</span><span class="m">1000</span> --val_sample_size<span class="o">=</span><span class="m">100</span> --num_train<span class="o">=</span><span class="m">1000</span> --noise<span class="o">=</span>bimodal
+</pre></div>
+</div>
+</div>
+<div class="section" id="id4">
+<h4><a class="toc-backref" href="#id22">Gaussian Likelihood with BbB (heteroscedastic noise)</a><a class="headerlink" href="#id4" title="Permalink to this headline">¶</a></h4>
+<p>The following run with <strong>20 training points</strong> achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_ghl.py --disable_lrt_test --n_iter<span class="o">=</span><span class="m">30001</span> --lr<span class="o">=</span><span class="m">0</span>.01 --train_sample_size<span class="o">=</span><span class="m">10</span> --local_reparam_trick --mlp_arch<span class="o">=</span><span class="m">10</span>,10 --net_act<span class="o">=</span>sigmoid --val_iter<span class="o">=</span><span class="m">1000</span> --val_sample_size<span class="o">=</span><span class="m">100</span> --num_train<span class="o">=</span><span class="m">20</span> --noise<span class="o">=</span>bimodal
+</pre></div>
+</div>
+<p>The following run with <strong>50 training points</strong> achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_ghl.py --disable_lrt_test --batch_size<span class="o">=</span><span class="m">32</span> --n_iter<span class="o">=</span><span class="m">30001</span> --lr<span class="o">=</span><span class="m">0</span>.001 --train_sample_size<span class="o">=</span><span class="m">10</span> --prior_variance<span class="o">=</span><span class="m">1</span>.0 --local_reparam_trick --kl_scale<span class="o">=</span><span class="m">0</span>.01 --mlp_arch<span class="o">=</span><span class="m">10</span>,10 --net_act<span class="o">=</span>relu --val_iter<span class="o">=</span><span class="m">1000</span> --val_sample_size<span class="o">=</span><span class="m">100</span> --num_train<span class="o">=</span><span class="m">50</span> --noise<span class="o">=</span>bimodal
+</pre></div>
+</div>
+<p>The following run with <strong>1000 training points</strong> achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_ghl.py --disable_lrt_test --n_iter<span class="o">=</span><span class="m">30001</span> --lr<span class="o">=</span><span class="m">0</span>.01 --train_sample_size<span class="o">=</span><span class="m">10</span> --local_reparam_trick --mlp_arch<span class="o">=</span><span class="m">10</span>,10 --net_act<span class="o">=</span>relu --val_iter<span class="o">=</span><span class="m">1000</span> --val_sample_size<span class="o">=</span><span class="m">100</span> --num_train<span class="o">=</span><span class="m">1000</span> --noise<span class="o">=</span>bimodal
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="bimodal-2d-toy-experiments">
+<h3><a class="toc-backref" href="#id23">Bimodal 2D Toy Experiments</a><a class="headerlink" href="#bimodal-2d-toy-experiments" title="Permalink to this headline">¶</a></h3>
+<p>Please run the following command to see the available options for running 2D toy experiments.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_gl_2d.py --help
+</pre></div>
+</div>
+<div class="section" id="id5">
+<h4><a class="toc-backref" href="#id24">Deterministic Gaussian Likelihood (homoscedastic noise)</a><a class="headerlink" href="#id5" title="Permalink to this headline">¶</a></h4>
+<p>The following run achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_gl_2d.py --kl_scale<span class="o">=</span><span class="m">0</span> --train_sample_size<span class="o">=</span><span class="m">1</span> --val_sample_size<span class="o">=</span><span class="m">1</span> --n_iter<span class="o">=</span><span class="m">10001</span> --lr<span class="o">=</span><span class="m">0</span>.01 --pred_dist_std<span class="o">=</span><span class="m">17</span> --mlp_arch<span class="o">=</span><span class="s2">&quot;20,20,20&quot;</span> --net_act<span class="o">=</span>relu --val_iter<span class="o">=</span><span class="m">1000</span> --num_train<span class="o">=</span><span class="m">3000</span> --mean_only --noise<span class="o">=</span>bimodal --offset<span class="o">=</span><span class="m">15</span> --cov<span class="o">=</span><span class="m">300</span>,20
+</pre></div>
+</div>
+</div>
+<div class="section" id="id6">
+<h4><a class="toc-backref" href="#id25">Deterministic Gaussian Likelihood (heteroscedastic noise)</a><a class="headerlink" href="#id6" title="Permalink to this headline">¶</a></h4>
+<p>The following run achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_ghl_2d.py --kl_scale<span class="o">=</span><span class="m">0</span> --train_sample_size<span class="o">=</span><span class="m">1</span> --val_sample_size<span class="o">=</span><span class="m">1</span> --n_iter<span class="o">=</span><span class="m">100001</span> --lr<span class="o">=</span><span class="m">0</span>.0001 --mlp_arch<span class="o">=</span><span class="m">20</span>,20,20 --net_act<span class="o">=</span>relu --val_iter<span class="o">=</span><span class="m">1000</span> --num_train<span class="o">=</span><span class="m">3000</span> --mean_only --noise<span class="o">=</span>bimodal --offset<span class="o">=</span><span class="m">15</span> --cov<span class="o">=</span><span class="m">300</span>,20
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="steering-angle-prediction-experiments">
+<h3><a class="toc-backref" href="#id26">Steering Angle Prediction Experiments</a><a class="headerlink" href="#steering-angle-prediction-experiments" title="Permalink to this headline">¶</a></h3>
+<p>Please run the following command to see the available options for running 1D toy experiments.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_gl_udacity.py --help
+</pre></div>
+</div>
+<div class="section" id="id7">
+<h4><a class="toc-backref" href="#id27">Deterministic Gaussian Likelihood (homoscedastic noise)</a><a class="headerlink" href="#id7" title="Permalink to this headline">¶</a></h4>
+<p>The following run achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_gl_udacity.py --kl_scale<span class="o">=</span><span class="m">0</span> --train_sample_size<span class="o">=</span><span class="m">1</span> --val_sample_size<span class="o">=</span><span class="m">1</span> --batch_size<span class="o">=</span><span class="m">32</span> --epochs<span class="o">=</span><span class="m">20</span> --lr<span class="o">=</span><span class="m">0</span>.0001 --adam_beta1<span class="o">=</span><span class="m">0</span>.7 --clip_grad_norm<span class="o">=</span>-1 --pred_dist_std<span class="o">=</span><span class="m">0</span>.05 --net_type<span class="o">=</span>iresnet --iresnet_use_fc_bias --store_models --use_empty_test_set --num_plotted_predictions<span class="o">=</span><span class="m">8</span> --mean_only
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="id8">
+<h3><a class="toc-backref" href="#id28">Steering Angle Prediction Experiments</a><a class="headerlink" href="#id8" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id9">
+<h4><a class="toc-backref" href="#id29">Deterministic Gaussian Likelihood (homoscedastic noise)</a><a class="headerlink" href="#id9" title="Permalink to this headline">¶</a></h4>
+<p>The following run with a <strong>Resnet-18</strong> achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_gl_udacity.py --use_empty_test_set --num_plotted_predictions<span class="o">=</span><span class="m">8</span> --mean_only --batch_size<span class="o">=</span><span class="m">64</span> --epochs<span class="o">=</span><span class="m">30</span> --lr<span class="o">=</span><span class="m">0</span>.0001 --adam_beta1<span class="o">=</span><span class="m">0</span>.5 --clip_grad_norm<span class="o">=</span><span class="m">100</span>.0 --pred_dist_std<span class="o">=</span><span class="m">0</span>.02 --kl_scale<span class="o">=</span><span class="m">0</span> --net_type<span class="o">=</span>iresnet --iresnet_use_fc_bias --net_act<span class="o">=</span>relu --train_sample_size<span class="o">=</span><span class="m">1</span> --val_sample_size<span class="o">=</span><span class="m">1</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id10">
+<h4><a class="toc-backref" href="#id30">Deterministic Gaussian Likelihood (heteroscedastic noise)</a><a class="headerlink" href="#id10" title="Permalink to this headline">¶</a></h4>
+<p>The following run with a <strong>Resnet-18</strong> achieves lowest negative log-likelihood on the validation set for this model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> python3 train_ghl_udacity.py --use_empty_test_set --mean_only --val_set_size<span class="o">=</span><span class="m">5000</span> --batch_size<span class="o">=</span><span class="m">32</span> --epochs<span class="o">=</span><span class="m">30</span> --lr<span class="o">=</span><span class="m">0</span>.0001 --adam_beta1<span class="o">=</span><span class="m">0</span>.9 --clip_grad_value<span class="o">=</span>-1 --clip_grad_norm<span class="o">=</span>-1.0 --prior_variance<span class="o">=</span><span class="m">1</span>.0 --pred_dist_std<span class="o">=</span><span class="m">3</span> --kl_scale<span class="o">=</span><span class="m">0</span> --net_type<span class="o">=</span><span class="s2">&quot;iresnet&quot;</span> --iresnet_use_fc_bias --net_act<span class="o">=</span><span class="s2">&quot;relu&quot;</span> --train_sample_size<span class="o">=</span><span class="m">1</span> --val_sample_size<span class="o">=</span><span class="m">1</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="section" id="module-gaussian_likelihoods.train_utils">
+<span id="api"></span><h2><a class="toc-backref" href="#id31">API</a><a class="headerlink" href="#module-gaussian_likelihoods.train_utils" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="helper-functions-for-training">
+<h3><a class="toc-backref" href="#id32">Helper functions for training</a><a class="headerlink" href="#helper-functions-for-training" title="Permalink to this headline">¶</a></h3>
+<p>A collection of helper functions for training to keep other scripts clean.</p>
+<dl class="function">
+<dt id="gaussian_likelihoods.train_utils.compute_cross_entropy">
+<code class="sig-prename descclassname">gaussian_likelihoods.train_utils.</code><code class="sig-name descname">compute_cross_entropy</code><span class="sig-paren">(</span><em class="sig-param">T</em>, <em class="sig-param">Y</em>, <em class="sig-param">sigma=None</em>, <em class="sig-param">reduction='mean'</em>, <em class="sig-param">ndims=1</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gaussian_likelihoods/train_utils.html#compute_cross_entropy"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#gaussian_likelihoods.train_utils.compute_cross_entropy" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the regression cross entropy loss.</p>
+<p>This function deals with a single model, and the sum for the MC estimate is
+therefore done outside this function.</p>
+<p>This function should be used as loss function for models with
+heteroscedastic Gaussian likelihood, as it allows to learn the variances.
+This function is derived by minimizing the KL divergence between ground
+truth and Gaussian model likelihood (for a derivation see dosctring of
+function <code class="xref py py-func docutils literal notranslate"><span class="pre">compute_loss()</span></code>). It computes the following loss:</p>
+<div class="math">
+<p><img src="_images/math/c006c96d2dc083a5519cf793f2eea459a4cc8ded.png" alt="L(y, \mu(x), \sigma(x)) = \frac{1}{n}\sum_{i=1}^n\left(\log \
+    (\sigma(x_i)) + \frac{1}{2}\left(\frac{y_i-\mu(x_i)}{\
+    \sigma(x_i)}\right)^2 \right)"/></p>
+</div><p>Note that it can also be derived from the KL between two gaussians:</p>
+<div class="math">
+<p><img src="_images/math/991e6afa56d0eece45b781fa4d8246c9bc31d5eb.png" alt="\mathbb{E}_{p(x)}[D_{KL}(p(y|x) \parallel q(y|x,w))] &amp;= \
+    \mathbb{E}_{p(x)} \big[\log(\frac{\sigma(x)}{\sigma_p(x)}) + \
+    \frac{\sigma_p(x)^2 + (\mu_p(x) - \mu(x))^2}{2 \sigma(x)^2} \
+    - \frac{1}{2} \big] \\
+    &amp;= \mathbb{E}_{p(x)} \big[\log(\frac{\sigma(x)}{\sigma_p(x)}) + \
+    \frac{\sigma_p(x)^2 + \mu_p(x)^2 - 2\mu_p(x)\mu(x)+ \mu(x)^2}{2 \
+    \sigma(x)^2} - \frac{1}{2} \big]"/></p>
+</div><p>where <img class="math" src="_images/math/d779bfc81449a9396441948d00c0f4ff79248405.png" alt="p(y \mid x)"/> is the groundtruth, <img class="math" src="_images/math/3e52362c2c35d1261dc1abb898fcdb91281d2b33.png" alt="q(y \mid x, w)"/>
+is the predictive distribution, and <img class="math" src="_images/math/2f4f89df7df354262eb7694716115f2d8d6552c1.png" alt="\mu_p(x)"/> and <img class="math" src="_images/math/8768dc9983f84404574a6d4b65df8117d0f0c4cb.png" alt="\sigma_p(x)"/>
+are the input-dependent means and standard deviations of the groundtruth.
+Now for machine learning applications we assume we can’t have
+access to the groundtruth, so we don’t have access to <img class="math" src="_images/math/2f4f89df7df354262eb7694716115f2d8d6552c1.png" alt="\mu_p(x)"/>,
+instead we have access to observations
+<img class="math" src="_images/math/02ed68715a7f0f2f41aafb8c09f5e5f7714497da.png" alt="y(x) = \mu_p(x) + \epsilon \sigma_p(x)"/> where
+<img class="math" src="_images/math/4b8600d7499c788413cd545bdb31a9c450fba094.png" alt="\epsilon \sim \mathcal{N}(0, 1)"/>.</p>
+<div class="math">
+<p><img src="_images/math/bad4130960540099d2bd03a723e5dbc68b9548b9.png" alt="\mathbb{E}_{p(x)}[D_{KL}(p(y|x) \parallel q(y|x,w))] &amp;= \
+    \mathbb{E}_{p(x)} \big[\log(\frac{\sigma(x)}{\sigma_p(x)}) + \
+    \frac{\mathbb{E}_{p(y|x)}[y^2] - 2\mathbb{E}_{p(y|x)}[y] \mu(x)+ \
+    \mu(x)^2}{2 \sigma(x)^2} - \frac{1}{2} \big] \\
+    &amp;= \mathbb{E}_{p(x)} \big[\log(\frac{\sigma(x)}{\sigma_p(x)}) + \
+    \frac{\mathbb{E}_{p(y|x)}[y^2 - 2 y \mu(x)+ \
+    \mu(x)^2]}{2 \sigma(x)^2} - \frac{1}{2} \big] \\
+    &amp;= \mathbb{E}_{p(x, y)} \big[\log(\frac{\sigma(x)}{\sigma_p(x)}) + \
+    \frac{(y - \mu(x))^2}{2 \sigma(x)^2} - \frac{1}{2} \big] \\"/></p>
+</div><p>where we have used that <img class="math" src="_images/math/39ea005ce2f894937e6e9f123f69ec43fd2ae253.png" alt="\mathbb{E}_{p(y|x)}[y] = \mu_p(x)"/> and
+<img class="math" src="_images/math/676498ccf23ab985d5844abb54ac1a47dd1a99be.png" alt="\mathbb{E}_{p(y|x)}[y^2] = var(y) + \mathbb{E}_{p(y|x)}[y]^2"/> so
+<img class="math" src="_images/math/77a28de6a75aa7453be97687647e1112e455e829.png" alt="\mathbb{E}_{p(y|x)}[y^2] = \sigma_p(x)^2 + \mu_p(x)^2"/>. Recall
+that <img class="math" src="_images/math/8768dc9983f84404574a6d4b65df8117d0f0c4cb.png" alt="\sigma_p(x)"/> is unknown, and drops from the optimization, so
+we recover the expression above when doing an MC estimate.</p>
+<p>In practice, since entorpy-related terms drop, for optimization we only care
+about the negative log-likelihood term up to some constants.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>(</strong><strong>...</strong><strong>)</strong> – See docstring of function <a class="reference internal" href="#gaussian_likelihoods.train_utils.compute_mse" title="gaussian_likelihoods.train_utils.compute_mse"><code class="xref py py-func docutils literal notranslate"><span class="pre">compute_mse()</span></code></a>.</p></li>
+<li><p><strong>ndims</strong> – Whether regression output is 1D or 2D.</p></li>
+<li><p><strong>sigma</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.10)"><em>float</em></a><em>, </em><em>optional</em>) – The standard deviation of the predictive
+distribution. Only provided for Gaussian models with homoscedastic
+variance.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The cross-entropy.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="gaussian_likelihoods.train_utils.compute_entropy_gaussian">
+<code class="sig-prename descclassname">gaussian_likelihoods.train_utils.</code><code class="sig-name descname">compute_entropy_gaussian</code><span class="sig-paren">(</span><em class="sig-param">mnet</em>, <em class="sig-param">config</em>, <em class="sig-param">x_torch</em>, <em class="sig-param">num_samples=1000</em>, <em class="sig-param">num_models=100</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gaussian_likelihoods/train_utils.html#compute_entropy_gaussian"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#gaussian_likelihoods.train_utils.compute_entropy_gaussian" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the entropy of a Gaussian posterior predictive distribution.</p>
+<p>We consider a Bayesian setting with a posterior predictive distribution:</p>
+<div class="math">
+<p><img src="_images/math/3e9430c8cf62694c24982a020312082cf34e8648.png" alt="p(y|D,x) &amp;= \int_w p(y|w,x)p(w |D) dw \\
+    &amp;\approx \frac{1}{K}\sum_{k=1}^K p(y|w_k,x)"/></p>
+</div><p>The differential entropy of this posterior predictive is given by:</p>
+<div class="math">
+<p><img src="_images/math/ac7cd42cd20d67aee5e14f03454f29f0edd1fef8.png" alt="h\big[p(y|D,x)\big] &amp;= -\int_{\mathcal{Y}} p(y|D,x) \log \
+    p(y|D,x) dy \\"/></p>
+</div><p>If we can draw samples from the posterior and both sample from and
+evaluate the likelihood <img class="math" src="_images/math/377fbe990fb080dcfcdbd9abdd0ded46f65c48b7.png" alt="p(y|w,x)"/>, we can estimate the differential
+entropy of the posterior predictive using a double Monte Carlo estimate as
+follows:</p>
+<div class="math">
+<p><img src="_images/math/c36d24dbe07b6e7a2e7f6fd7d9e3389e1c917a37.png" alt="h\big[p(y|D,x)\big] \approx - \frac{1}{N} \sum_{i=1}^N \log \
+    \Big( \frac{1}{K}\sum_{k=1}^K p(y_i|w_k,x) \Big)"/></p>
+</div><p>where <img class="math" src="_images/math/a5a1c0cab84c50340d79121d49a66450dfcd489a.png" alt="\{y_i\}_{i=1}^N"/> is a Monte Carlo sample from the posterior
+predictive (not from a specific model). A sample <img class="math" src="_images/math/1b5e577d6216dca3af7d87aa122a0b9b360d6cb3.png" alt="y"/> can be drawn from
+the posterior predictive as follows:</p>
+<div class="math">
+<p><img src="_images/math/0aa7a7d7aaa2d08f90058fd08fc6d21c34c5d64b.png" alt="&amp;\hat{w} \sim p(w|D)\text{, and then}\\
+&amp;y \sim p(y|\hat{w},x)"/></p>
+</div><dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mnet</strong> – The main network.</p></li>
+<li><p><strong>config</strong> – The configuration.</p></li>
+<li><p><strong>x_torch</strong> (<a class="reference external" href="https://pytorch.org/docs/master/tensors.html#torch.Tensor" title="(in PyTorch v1.12)"><em>torch.Tensor</em></a>) – The inputs.</p></li>
+<li><p><strong>num_samples</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.10)"><em>int</em></a>) – The number of samples to use for each input.</p></li>
+<li><p><strong>num_models</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.10)"><em>int</em></a>) – The number of models to sample for Bayesian networks.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>The averaged entropy across weight samples for the entire</dt><dd><p>input range.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(np.array)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="gaussian_likelihoods.train_utils.compute_mse">
+<code class="sig-prename descclassname">gaussian_likelihoods.train_utils.</code><code class="sig-name descname">compute_mse</code><span class="sig-paren">(</span><em class="sig-param">T</em>, <em class="sig-param">Y</em>, <em class="sig-param">ndims=1</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gaussian_likelihoods/train_utils.html#compute_mse"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#gaussian_likelihoods.train_utils.compute_mse" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the MSE between predictions and targets.</p>
+<p>This function deals with a single model, and the sum for the MC estimate is
+therefore done outside this function.</p>
+<p>This function should be used as loss function for models with homoscedastic
+Gaussian likelihood, as it does not allow to learn the variances.</p>
+<p>This function simply computes:</p>
+<div class="math">
+<p><img src="_images/math/054493c5adf79c1b989a041ba0f266b54f686f6b.png" alt="\frac{1}{n}\sum_{i=1}^n (y_i-\mu(x_i))^2"/></p>
+</div><p>It can be derived from the loss expression found in <code class="xref py py-func docutils literal notranslate"><span class="pre">compute_loss()</span></code>.</p>
+<div class="math">
+<p><img src="_images/math/c006c96d2dc083a5519cf793f2eea459a4cc8ded.png" alt="L(y, \mu(x), \sigma(x)) = \frac{1}{n}\sum_{i=1}^n\left(\log \
+    (\sigma(x_i)) + \frac{1}{2}\left(\frac{y_i-\mu(x_i)}{\
+    \sigma(x_i)}\right)^2 \right)"/></p>
+</div><p>Since the variances are not learned in this setting,
+<img class="math" src="_images/math/e9106d344e19d75401571e46c44f7cebbf94b30e.png" alt="\sigma(x_i) = \sigma"/>, and the term <img class="math" src="_images/math/f14125f486fb7d77b7e01e46f5cbdebea400f3ab.png" alt="\log (\sigma(x_i))"/> is
+constant w.r.t. the learnable parameters and can be dropped.
+We therefore obtain:</p>
+<div class="math">
+<p><img src="_images/math/ca512be51e2257f2eb1f7656fc712b92bf456060.png" alt="L(y, \mu(x), \sigma(x)) = \frac{1}{n}\sum_{i=1}^n\left(\frac{1}{2} \
+    \left(\frac{y_i-\mu(x_i)}{\sigma}\right)^2 \right)"/></p>
+</div><p>which is simply the MSE scaled by <img class="math" src="_images/math/a4534d967346fb4113ad622b750f61246738ce6d.png" alt="2 \sigma^2"/>, where <img class="math" src="_images/math/b52df27bfb0b1e3af0c2c68a7b9da459178c2a7d.png" alt="\sigma"/>
+corresponds to our parameter <code class="docutils literal notranslate"><span class="pre">config.pred_dist_std</span></code>.</p>
+<p>Note that it can also be derived from the KL between two gaussians:</p>
+<div class="math">
+<p><img src="_images/math/03ea0b1a88ed6c97ad263a818a80ba2a7aa1045c.png" alt="\mathbb{E}_{p(x)}[D_{KL}(p(y \mid x) \mid\mid q(y \mid x,w))] = \
+    \mathbb{E}_{p(x)}[\log(\frac{\sigma}{\sigma_p})+ \
+    \frac{\sigma_p^2 + (\mu_p(x) - \mu(x))^2}{2 \sigma^2} - \frac{1}{2}]"/></p>
+</div><p>where <img class="math" src="_images/math/d779bfc81449a9396441948d00c0f4ff79248405.png" alt="p(y \mid x)"/> is the groundtruth, <img class="math" src="_images/math/3e52362c2c35d1261dc1abb898fcdb91281d2b33.png" alt="q(y \mid x, w)"/>
+is the predictive distribution, and <img class="math" src="_images/math/2f4f89df7df354262eb7694716115f2d8d6552c1.png" alt="\mu_p(x)"/> and <img class="math" src="_images/math/562882e999cd59efe7f6211f770b3ac97eec184a.png" alt="\sigma_p"/>
+are the input-dependent means and the fixed standard deviation of the
+groundtruth. Again, since only the means are learned we can drop constant
+terms and obtain the same expression as above.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T</strong> – The target tensor. It has shape <code class="docutils literal notranslate"><span class="pre">[batch_size,</span> <span class="pre">1]</span></code>
+since the loss is comupted separately for each weight sample.</p></li>
+<li><p><strong>Y</strong> – Output tensor consisting of means. Same shape as <code class="docutils literal notranslate"><span class="pre">T</span></code>.</p></li>
+<li><p><strong>ndims</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.10)"><em>int</em></a>) – Dimensionality of the output space.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The MSE.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.10)">float</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="gaussian_likelihoods.train_utils.compute_nll">
+<code class="sig-prename descclassname">gaussian_likelihoods.train_utils.</code><code class="sig-name descname">compute_nll</code><span class="sig-paren">(</span><em class="sig-param">T</em>, <em class="sig-param">Y</em>, <em class="sig-param">sigma=None</em>, <em class="sig-param">ndims=1</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gaussian_likelihoods/train_utils.html#compute_nll"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#gaussian_likelihoods.train_utils.compute_nll" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the negative log-likehood of a Gaussian.</p>
+<p>It computes the following quantity:</p>
+<div class="math">
+<p><img src="_images/math/8f0b277364309c679bf0e349f6ff1ff5069dee6a.png" alt="- \log q(y | x, w) &amp;=  - \log \mathcal{N} (\mu, \sigma^2) \\
+    &amp;= - \log \Big[ \frac{1}{\sqrt{2 \pi} \sigma} exp \big( - \
+    \frac{(y - \mu)^2}{2 \sigma^2}\big) \Big] \\
+    &amp;= \frac{1}{2} \log (2 \pi) + \log \sigma + \
+    \frac{(y - \mu)^2}{2 \sigma^2}"/></p>
+</div><p>Assuming i.i.d. data, <img class="math" src="_images/math/345c90a41e6d3d34bb800a2fca23e556f16d208f.png" alt="q(y | x, w)"/> is a product of the probabilities
+of individual samples, which corresponds to a sum in log scale.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>T</strong> – The target tensor. It has shape <code class="docutils literal notranslate"><span class="pre">[batch_size,</span> <span class="pre">1]</span></code>
+since the loss is comupted separately for each weight sample.</p></li>
+<li><p><strong>Y</strong> – Output tensor consisting of means. Same shape as <code class="docutils literal notranslate"><span class="pre">T</span></code> for cases
+with homoscedastic variance, else it will have a second column with
+the variances.</p></li>
+<li><p><strong>sigma</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.10)"><em>float</em></a><em>, </em><em>optional</em>) – The standard deviation of the predictive
+distribution. Only provided for Gaussian models with homoscedastic
+variance.</p></li>
+<li><p><strong>ndims</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.10)"><em>int</em></a>) – Dimensionality of the output space.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The negative log-likelihood.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.10)">float</a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">regression_uncertainty_mm</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents of this repository:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Gaussian Likelihoods</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#general-notes">General Notes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-gaussian_likelihoods.train_utils">API</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="norm_flow.html">Normalizing Flows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="networks.html">Networks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="probabilistic.html">Probabilistic</a></li>
+<li class="toctree-l1"><a class="reference internal" href="datasets.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="utils.html">Utilities</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">Welcome to regression_uncertainty_mm’s documentation!</a></li>
+      <li>Next: <a href="norm_flow.html" title="next chapter">Normalizing Flows</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2021, Maria R. Cervera, Rafael Daetwyler, Hamza Keurti, Francesco dAngelo, Christian Henning.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/gaussian_likelihoods.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

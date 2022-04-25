@@ -1,0 +1,291 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Utilities &#8212; regression_uncertainty_mm 0.1 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Datasets" href="datasets.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="utilities">
+<span id="utils-reference-label"></span><h1><a class="toc-backref" href="#id1">Utilities</a><a class="headerlink" href="#utilities" title="Permalink to this headline">¶</a></h1>
+<div class="contents topic" id="contents">
+<p class="topic-title first">Contents</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#utilities" id="id1">Utilities</a></p>
+<ul>
+<li><p><a class="reference internal" href="#general-notes" id="id2">General Notes</a></p></li>
+<li><p><a class="reference internal" href="#module-utils.math_utils" id="id3">API</a></p>
+<ul>
+<li><p><a class="reference internal" href="#helper-functions-for-math-operations" id="id4">Helper functions for math operations</a></p></li>
+<li><p><a class="reference internal" href="#helper-functions-for-simulations" id="id5">Helper functions for simulations</a></p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="general-notes">
+<h2><a class="toc-backref" href="#id2">General Notes</a><a class="headerlink" href="#general-notes" title="Permalink to this headline">¶</a></h2>
+<p>Miscellaneous utilities for performing experiments.</p>
+</div>
+<div class="section" id="module-utils.math_utils">
+<span id="api"></span><h2><a class="toc-backref" href="#id3">API</a><a class="headerlink" href="#module-utils.math_utils" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="helper-functions-for-math-operations">
+<h3><a class="toc-backref" href="#id4">Helper functions for math operations</a><a class="headerlink" href="#helper-functions-for-math-operations" title="Permalink to this headline">¶</a></h3>
+<p>A collection of helper math functions.</p>
+<dl class="function">
+<dt id="utils.math_utils.dirac_delta">
+<code class="sig-prename descclassname">utils.math_utils.</code><code class="sig-name descname">dirac_delta</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">mu</em>, <em class="sig-param">eps=2</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/math_utils.html#dirac_delta"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.math_utils.dirac_delta" title="Permalink to this definition">¶</a></dt>
+<dd><p>Heuristic dirac delta function for zero standard deviation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> (<em>np.array</em>) – The range of values where to obtain the probabilities.</p></li>
+<li><p><strong>mu</strong> – The mean.</p></li>
+<li><p><strong>eps</strong> – The width of the dirac in number of array items.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The probabilities.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(np.array)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="utils.math_utils.interpolate">
+<code class="sig-prename descclassname">utils.math_utils.</code><code class="sig-name descname">interpolate</code><span class="sig-paren">(</span><em class="sig-param">xvals</em>, <em class="sig-param">vals</em>, <em class="sig-param">n=300</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/math_utils.html#interpolate"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.math_utils.interpolate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Interpolates between the values of an input array with normalization.</p>
+<p>To be used over distribution functions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>xvals</strong> (<em>np.array</em>) – Array of positions associated with vals.</p></li>
+<li><p><strong>vals</strong> (<em>np.array</em>) – Array of evaluations of the function at positions xvals.</p></li>
+<li><p><strong>n</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.10)"><em>int</em></a>) – Number of uniformly placed evaluation positions in the
+initial interval, where the function will be evaluated.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>new sampling positions
+vals_smooth (np.array): interpolations at the positions xvals_new.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>xvals_new (np.array)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="utils.math_utils.normal_dist">
+<code class="sig-prename descclassname">utils.math_utils.</code><code class="sig-name descname">normal_dist</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">mu</em>, <em class="sig-param">sigma</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/math_utils.html#normal_dist"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.math_utils.normal_dist" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute probabilities according to a Gaussian distribution.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> (<em>np.array</em>) – The range of values where to obtain the probabilities.</p></li>
+<li><p><strong>mu</strong> – The mean.</p></li>
+<li><p><strong>sigma</strong> – The variance.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The probabilities.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(np.array)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="utils.math_utils.normal_dist_2D">
+<code class="sig-prename descclassname">utils.math_utils.</code><code class="sig-name descname">normal_dist_2D</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">mu</em>, <em class="sig-param">cov</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/math_utils.html#normal_dist_2D"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.math_utils.normal_dist_2D" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute probabilities according to a Bivariate Gaussian distribution.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> (<em>np.array</em>) – Array of positions where to obtain the probabilities.</p></li>
+<li><p><strong>dimension corresponds to dimensions of the gaussian.</strong> (<em>First</em>) – </p></li>
+<li><p><strong>mu</strong> – The mean.</p></li>
+<li><p><strong>sigma</strong> – The variance.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The probabilities.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(np.array)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+<span class="target" id="module-utils.sim_utils"></span><div class="section" id="helper-functions-for-simulations">
+<h3><a class="toc-backref" href="#id5">Helper functions for simulations</a><a class="headerlink" href="#helper-functions-for-simulations" title="Permalink to this headline">¶</a></h3>
+<p>A collection of helper functions for simulations to keep other scripts clean.</p>
+<dl class="function">
+<dt id="utils.sim_utils.backup_cli_command">
+<code class="sig-prename descclassname">utils.sim_utils.</code><code class="sig-name descname">backup_cli_command</code><span class="sig-paren">(</span><em class="sig-param">config</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/sim_utils.html#backup_cli_command"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.sim_utils.backup_cli_command" title="Permalink to this definition">¶</a></dt>
+<dd><p>Write the curret CLI call into a script.</p>
+<p>This will make it very easy to reproduce a run, by just copying the call
+from the script in the output folder. However, this call might be ambiguous
+in case default values have changed. In contrast, all default values are
+backed up in the file <code class="docutils literal notranslate"><span class="pre">config.json</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>(</strong><strong>...</strong><strong>)</strong> – See docstring of function <a class="reference internal" href="#utils.sim_utils.setup_summary_dict" title="utils.sim_utils.setup_summary_dict"><code class="xref py py-func docutils literal notranslate"><span class="pre">setup_summary_dict()</span></code></a>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="utils.sim_utils.save_summary_dict">
+<code class="sig-prename descclassname">utils.sim_utils.</code><code class="sig-name descname">save_summary_dict</code><span class="sig-paren">(</span><em class="sig-param">config</em>, <em class="sig-param">shared</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/sim_utils.html#save_summary_dict"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.sim_utils.save_summary_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Write a text file in the result folder that gives a quick
+overview over the results achieved so far.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>(</strong><strong>...</strong><strong>)</strong> – See docstring of function <a class="reference internal" href="#utils.sim_utils.setup_summary_dict" title="utils.sim_utils.setup_summary_dict"><code class="xref py py-func docutils literal notranslate"><span class="pre">setup_summary_dict()</span></code></a>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="utils.sim_utils.setup_shared">
+<code class="sig-prename descclassname">utils.sim_utils.</code><code class="sig-name descname">setup_shared</code><span class="sig-paren">(</span><em class="sig-param">config</em>, <em class="sig-param">device</em>, <em class="sig-param">mnet</em>, <em class="sig-param">hnet=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/sim_utils.html#setup_shared"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.sim_utils.setup_shared" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set up simple structure used to share data among functions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>config</strong> – The experiment config.</p></li>
+<li><p><strong>device</strong> – The device.</p></li>
+<li><p><strong>mnet</strong> – The main network.</p></li>
+<li><p><strong>hnet</strong> – The (optional) hypernetwork.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The shared structure.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>(Namespace)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="utils.sim_utils.setup_summary_dict">
+<code class="sig-prename descclassname">utils.sim_utils.</code><code class="sig-name descname">setup_summary_dict</code><span class="sig-paren">(</span><em class="sig-param">config</em>, <em class="sig-param">shared</em>, <em class="sig-param">mnet</em>, <em class="sig-param">hnet=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/utils/sim_utils.html#setup_summary_dict"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#utils.sim_utils.setup_summary_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Setup the summary dictionary that is written to the performance
+summary file (in the result folder).</p>
+<p>This method adds the keyword “summary” to <cite>shared</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>config</strong> – Command-line arguments.</p></li>
+<li><p><strong>shared</strong> – Miscellaneous data shared among training functions (summary dict
+will be added to this <a class="reference external" href="https://docs.python.org/3/library/argparse.html#argparse.Namespace" title="(in Python v3.10)"><code class="xref py py-class docutils literal notranslate"><span class="pre">argparse.Namespace</span></code></a>).</p></li>
+<li><p><strong>mnet</strong> – Main network.</p></li>
+<li><p><strong>hnet</strong> (<em>optional</em>) – Hypernetwork.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">regression_uncertainty_mm</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents of this repository:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="gaussian_likelihoods.html">Gaussian Likelihoods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="norm_flow.html">Normalizing Flows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="networks.html">Networks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="probabilistic.html">Probabilistic</a></li>
+<li class="toctree-l1"><a class="reference internal" href="datasets.html">Datasets</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Utilities</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#general-notes">General Notes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-utils.math_utils">API</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="datasets.html" title="previous chapter">Datasets</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2021, Maria R. Cervera, Rafael Daetwyler, Hamza Keurti, Francesco dAngelo, Christian Henning.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/utils.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

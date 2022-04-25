@@ -1,0 +1,244 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>normalizing_flows.simple_regression.layers.perceptron &#8212; regression_uncertainty_mm 0.1 documentation</title>
+    <link rel="stylesheet" href="../../../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../../" src="../../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for normalizing_flows.simple_regression.layers.perceptron</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># Copyright 2021 Maria Cervera</span>
+
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#    http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+<span class="c1">#</span>
+<span class="c1"># @title          :normalizing_flows/simple_regression/layers/perceptron.py</span>
+<span class="c1"># @author         :mc</span>
+<span class="c1"># @contact        :mariacer@ethz.ch</span>
+<span class="c1"># @created        :24/08/2021</span>
+<span class="c1"># @version        :1.0</span>
+<span class="c1"># @python_version :3.7.4</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Perceptron for a normalizing flow</span>
+<span class="sd">---------------------------------</span>
+
+<span class="sd">Original code by Francesco d&#39;Angelo and Rafael Daetwyler. </span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">from</span> <span class="nn">nflows.transforms.base</span> <span class="k">import</span> <span class="n">Transform</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+
+<div class="viewcode-block" id="Perceptron"><a class="viewcode-back" href="../../../../norm_flow.html#normalizing_flows.simple_regression.layers.perceptron.Perceptron">[docs]</a><span class="k">class</span> <span class="nc">Perceptron</span><span class="p">(</span><span class="n">Transform</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Implementation of a perceptron layer for normalizing flows.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Perceptron.forward"><a class="viewcode-back" href="../../../../norm_flow.html#normalizing_flows.simple_regression.layers.perceptron.Perceptron.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Forward pass through the layer.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            input (torch.Tensor): The inputs to the layer.</span>
+<span class="sd">            context (list): Miscellaneous information. It is a list of length</span>
+<span class="sd">                four containing:</span>
+
+<span class="sd">                * the parameters (weights and biases) of the</span>
+<span class="sd">                * the index of the layer</span>
+<span class="sd">                * the nonlinearity</span>
+<span class="sd">                * a dictionary of remaining kwargs </span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (tuple): Tuple containing:</span>
+
+<span class="sd">            - **output**: The output of the layer.</span>
+<span class="sd">            - **logabsdet**: The log of the absolute values of the derivative.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="p">(</span><span class="n">w_weights</span><span class="p">,</span> <span class="n">b_weights</span><span class="p">),</span> <span class="n">i</span><span class="p">,</span> <span class="n">act_fn</span><span class="p">,</span> <span class="n">kwargs</span> <span class="o">=</span> <span class="n">context</span>
+
+        <span class="c1"># Compute the forward pass applying the non-linearity.</span>
+        <span class="n">lin</span> <span class="o">=</span> <span class="n">w_weights</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">inputs</span> <span class="o">+</span> <span class="n">b_weights</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="n">act_fn</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">lin</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="c1"># Compute the derivative of the forward pass.</span>
+        <span class="n">f_deriv</span> <span class="o">=</span> <span class="n">w_weights</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">act_fn</span><span class="o">.</span><span class="n">forward_derivative</span><span class="p">(</span><span class="n">lin</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="c1"># Compute the log of the absolute value of the derivative.</span>
+        <span class="n">logabsdet</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">f_deriv</span><span class="p">))</span>  <span class="c1"># +1e-7</span>
+
+        <span class="k">return</span> <span class="n">output</span><span class="p">,</span> <span class="n">logabsdet</span></div>
+
+<div class="viewcode-block" id="Perceptron.inverse"><a class="viewcode-back" href="../../../../norm_flow.html#normalizing_flows.simple_regression.layers.perceptron.Perceptron.inverse">[docs]</a>    <span class="k">def</span> <span class="nf">inverse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Inverse pass through the layer.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            input (torch.Tensor): The (inverse) inputs to the layer.</span>
+<span class="sd">            (....): See docstring of function :func:`forward`.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (tuple): Tuple containing:</span>
+
+<span class="sd">            - **output**: The output of the layer.</span>
+<span class="sd">            - **logabsdet**: The log of the absolute values of the derivative.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="p">(</span><span class="n">w_weights</span><span class="p">,</span> <span class="n">b_weights</span><span class="p">),</span> <span class="n">i</span><span class="p">,</span> <span class="n">act_fn</span><span class="p">,</span> <span class="n">kwargs</span> <span class="o">=</span> <span class="n">context</span>
+
+        <span class="c1"># Compute the inverse pass applying the inverse of the non-linearity.</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="p">(</span><span class="n">act_fn</span><span class="o">.</span><span class="n">inverse</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-</span> <span class="n">b_weights</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="o">/</span> <span class="n">w_weights</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+
+        <span class="c1"># Compute the derivative of the forward pass (bias terms drops).</span>
+        <span class="n">deriv</span> <span class="o">=</span> <span class="n">act_fn</span><span class="o">.</span><span class="n">inverse_derivative</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">/</span> <span class="n">w_weights</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+
+        <span class="c1"># Compute the log of the absolute value of the derivative.</span>
+        <span class="n">logabsdet</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">deriv</span><span class="p">))</span>  <span class="c1"># +1e-7</span>
+        
+        <span class="k">return</span> <span class="n">output</span><span class="p">,</span> <span class="n">logabsdet</span></div>
+
+<div class="viewcode-block" id="Perceptron.preprocess_weights"><a class="viewcode-back" href="../../../../norm_flow.html#normalizing_flows.simple_regression.layers.perceptron.Perceptron.preprocess_weights">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">preprocess_weights</span><span class="p">(</span><span class="n">weights</span><span class="p">,</span> <span class="n">bias</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Preprocess the weights.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            weights (torch.Tensor): The weights.</span>
+<span class="sd">            bias (bool): Whether a bias term exists.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (tuple): Tuple containing:</span>
+
+<span class="sd">            -**w_weights**: The weights.</span>
+<span class="sd">            -**b_weights**: The biases.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># TODO: adapt this for hnet.forward(ret_format=&#39;flattened&#39;) output</span>
+        <span class="n">device</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">device</span>
+        <span class="n">batch_size</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">weights</span><span class="p">)</span>
+        <span class="n">depth</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">weights</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">//</span> <span class="mi">2</span> <span class="k">if</span> <span class="n">bias</span> <span class="k">else</span> <span class="nb">len</span><span class="p">(</span><span class="n">weights</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">w_weights</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> \
+            <span class="nb">range</span><span class="p">(</span><span class="n">depth</span><span class="p">)]</span>
+
+        <span class="k">if</span> <span class="n">bias</span><span class="p">:</span>
+            <span class="n">b_weights</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> \
+                <span class="nb">range</span><span class="p">(</span><span class="n">depth</span><span class="p">)]</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">weights</span><span class="p">):</span>
+                <span class="k">assert</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">==</span> <span class="n">depth</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">o</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">p</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">j</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                        <span class="n">b_weights</span><span class="p">[</span><span class="n">j</span> <span class="o">//</span> <span class="mi">2</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">o</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">w_weights</span><span class="p">[</span><span class="n">j</span> <span class="o">//</span> <span class="mi">2</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">Perceptron</span><span class="o">.</span><span class="n">make_invertible</span><span class="p">(</span><span class="n">o</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">b_weights</span> <span class="o">=</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span> \
+                <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">depth</span><span class="p">)]</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">weights</span><span class="p">):</span>
+                <span class="k">assert</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="o">==</span> <span class="n">depth</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">o</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">p</span><span class="p">):</span>
+                    <span class="n">w_weights</span><span class="p">[</span><span class="n">j</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">Perceptron</span><span class="o">.</span><span class="n">make_invertible</span><span class="p">(</span><span class="n">o</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">w_weights</span><span class="p">,</span> <span class="n">b_weights</span></div>
+
+<div class="viewcode-block" id="Perceptron.make_invertible"><a class="viewcode-back" href="../../../../norm_flow.html#normalizing_flows.simple_regression.layers.perceptron.Perceptron.make_invertible">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">make_invertible</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Make weight matrix invetible.</span>
+
+<span class="sd">        Ensures that all weight magnitues are at least `eps`.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            w: The weight matrix.</span>
+<span class="sd">            eps (float): The value to be added to the weights.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            The weights.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">w</span> <span class="o">+</span> <span class="p">((</span><span class="n">w</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="n">w</span> <span class="o">&lt;</span> <span class="n">eps</span><span class="p">))</span><span class="o">*</span><span class="n">eps</span> \
+                 <span class="o">-</span> <span class="p">((</span><span class="n">w</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="n">w</span> <span class="o">&gt;</span> <span class="o">-</span><span class="n">eps</span><span class="p">))</span><span class="o">*</span><span class="n">eps</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../../index.html">regression_uncertainty_mm</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents of this repository:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../gaussian_likelihoods.html">Gaussian Likelihoods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../norm_flow.html">Normalizing Flows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../networks.html">Networks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../probabilistic.html">Probabilistic</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../datasets.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../utils.html">Utilities</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2021, Maria R. Cervera, Rafael Daetwyler, Hamza Keurti, Francesco dAngelo, Christian Henning.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

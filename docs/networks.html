@@ -1,0 +1,232 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Networks &#8212; regression_uncertainty_mm 0.1 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Probabilistic" href="probabilistic.html" />
+    <link rel="prev" title="Normalizing Flows" href="norm_flow.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="networks">
+<span id="networks-reference-label"></span><h1><a class="toc-backref" href="#id1">Networks</a><a class="headerlink" href="#networks" title="Permalink to this headline">¶</a></h1>
+<div class="contents topic" id="contents">
+<p class="topic-title first">Contents</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#networks" id="id1">Networks</a></p>
+<ul>
+<li><p><a class="reference internal" href="#module-networks.gauss_mlp" id="id2">API</a></p>
+<ul>
+<li><p><a class="reference internal" href="#mlp-that-implements-the-local-reparametrization-trick" id="id3">MLP that implements the local reparametrization trick</a></p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+<p>This module contains all relevant functions to generate networks.</p>
+<div class="section" id="module-networks.gauss_mlp">
+<span id="api"></span><h2><a class="toc-backref" href="#id2">API</a><a class="headerlink" href="#module-networks.gauss_mlp" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="mlp-that-implements-the-local-reparametrization-trick">
+<h3><a class="toc-backref" href="#id3">MLP that implements the local reparametrization trick</a><a class="headerlink" href="#mlp-that-implements-the-local-reparametrization-trick" title="Permalink to this headline">¶</a></h3>
+<p>The module <code class="xref py py-mod docutils literal notranslate"><span class="pre">probabilisic.gauss_mlp</span></code> contains a MLP reimplementation that
+implements the local reparametrization trick as described in</p>
+<blockquote>
+<div><p>Kingma et al., “Variational Dropout and the Local Reparameterization Trick”,
+2015. <a class="reference external" href="https://arxiv.org/abs/1506.02557">https://arxiv.org/abs/1506.02557</a></p>
+</div></blockquote>
+<dl class="class">
+<dt id="networks.gauss_mlp.GaussianMLP">
+<em class="property">class </em><code class="sig-prename descclassname">networks.gauss_mlp.</code><code class="sig-name descname">GaussianMLP</code><span class="sig-paren">(</span><em class="sig-param">n_in=1, n_out=1, hidden_layers=[10, 10], activation_fn=ReLU(), use_bias=True, no_weights=False, init_weights=None, verbose=True</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/networks/gauss_mlp.html#GaussianMLP"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#networks.gauss_mlp.GaussianMLP" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">hypnettorch.mnets.MLP</span></code></p>
+<p>Multi-layer-perceptron with fully-factorized Gaussian weight posterior.</p>
+<p>This class assumes that the weight posterior is a fully-factorized Gaussian,
+such that the local reparametrization trick can be applied. Hence, assuming
+a batch size <img class="math" src="_images/math/4abba779877abb276b98ccb2b4ba9bf2e41947ab.png" alt="M"/>, a layer input size of <img class="math" src="_images/math/94e5a63c426e70ce8e3b6a2b36be6970377dcb5a.png" alt="N_{in}"/> and a layer
+output size of <img class="math" src="_images/math/1ac559d360ccca8c8ebcda1ce39b86c03263187b.png" alt="N_{out}"/> a linear layer performs the following
+operation</p>
+<div class="math">
+<p><img src="_images/math/50793c264640774d72c3106024ea0dc8f5009f33.png" alt="Y = X W"/></p>
+</div><p>with inputs <img class="math" src="_images/math/17eec28f4f72555b44e7d38d06a273a919f42fd2.png" alt="X \in \mathbb{R}^{M \times N_{in}}"/>, weights
+<img class="math" src="_images/math/2251cea719f5e9051a2dbd33b5b0fcb8d27fc155.png" alt="W \in \mathbb{R}^{N_{in} \times N_{out}}"/> and outputs
+<img class="math" src="_images/math/a12153315c285614888f062110d3afc08c8fdc41.png" alt="Y \in \mathbb{R}^{M \times N_{out}}"/>.</p>
+<p>Elements in <img class="math" src="_images/math/1fbee781f84569077719a167b64e12064360fac1.png" alt="W"/> are expected to arise from the following factorized
+Gaussian</p>
+<div class="math">
+<p><img src="_images/math/d9fc6c8f01dd26471d5ab07cf77fe501feb935ed.png" alt="q_{\phi}(w_{ij}) = \mathcal{N} (\mu_{ij}, \sigma_{ij}^2)"/></p>
+</div><p>As shown by <a class="reference external" href="https://arxiv.org/abs/1506.02557">Kingma et al.</a>, the
+variance of the likelihood estimator will decrease to zero with increasing
+batch size if a different weight sample is drawn for every sample in the
+mini-batch.</p>
+<p>They show a more computational efficient solution is to sample activations,
+which follow the following factorized Gaussian given the above weight
+posterior</p>
+<div class="math">
+<p><img src="_images/math/e07a383ad063bac7de26c2a3ae49c4a0d62a3ff8.png" alt="q_{\phi}(y_{mj}) = \mathcal{N} (\gamma_{mj}, \delta_{mj}) \quad \
+    \text{with} \quad \
+    \gamma_{mj} = \sum_{i=1}^{N_{in}} x_{mi} \mu_{ij} \quad \
+    \delta_{mj} = \sum_{i=1}^{N_{in}} x_{mi}^2 \sigma_{ij}^2"/></p>
+</div><p>Hence, we can simply sample activations using the above distribution and
+the reparametrization trick</p>
+<div class="math">
+<p><img src="_images/math/6ea17edb2d15bcdf430eddebb74302e17cb117ba.png" alt="y_{mj} = \gamma_{mj} + \sqrt{\delta_{mj}} \zeta_{mj} \quad \text{, } \
+    \zeta_{mj} \sim \mathcal{N}(0, 1)"/></p>
+</div><p>What about bias vectors <img class="math" src="_images/math/4be407c4002c23a96a939a1d3677e4f8dc333ad3.png" alt="b \in \mathbb{R}^{N_{out}}"/>? We can easily
+incorporating them in the above formulas, by just assuming that we append an
+additional column to <img class="math" src="_images/math/ed38fa24f1c94891bd312012aab3f6673be3eb83.png" alt="X"/> containing ones and an additional row to
+<img class="math" src="_images/math/1fbee781f84569077719a167b64e12064360fac1.png" alt="W"/> containing the bias vector. In this case, the formulas become</p>
+<div class="math">
+<p><img src="_images/math/356b97f8b676405397b379a10e95a68abf5dbc79.png" alt="\gamma_{mj} = \sum_{i=1}^{N_{in}} x_{mi} \mu_{ij} + \
+    \hat{\mu}_{j} \quad \
+    \delta_{mj} = \sum_{i=1}^{N_{in}} x_{mi}^2 \sigma_{ij}^2 + \
+    \hat{\sigma}_{j}^2"/></p>
+</div><p>where we assume that
+<img class="math" src="_images/math/aa7cc98c7c6d829afc80794748804908a7598c98.png" alt="q_{\phi}(b_{j}) = \mathcal{N} (\hat{\mu}_{j}, \hat{\sigma}_{j}^2)"/>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This class will not hold mean and variance weights (even though, it
+is exoected that they are passed to the <a class="reference internal" href="#networks.gauss_mlp.GaussianMLP.forward" title="networks.gauss_mlp.GaussianMLP.forward"><code class="xref py py-meth docutils literal notranslate"><span class="pre">forward()</span></code></a>). Therefore, we
+recommend using an instance of this class always wrapped by class
+<code class="xref py py-class docutils literal notranslate"><span class="pre">probabilistic.gauss_mnet_interface.GaussianBNNWrapper</span></code>.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>(</strong><strong>...</strong><strong>)</strong> – See constructor documentation of class <code class="xref py py-class docutils literal notranslate"><span class="pre">mnets.mlp.MLP</span></code>.</p>
+</dd>
+</dl>
+<dl class="method">
+<dt id="networks.gauss_mlp.GaussianMLP.forward">
+<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">mean</em>, <em class="sig-param">rho</em>, <em class="sig-param">logvar_enc=False</em>, <em class="sig-param">mean_only=False</em>, <em class="sig-param">sample=None</em>, <em class="sig-param">rand_state=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/networks/gauss_mlp.html#GaussianMLP.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#networks.gauss_mlp.GaussianMLP.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Compute the output <img class="math" src="_images/math/1b5e577d6216dca3af7d87aa122a0b9b360d6cb3.png" alt="y"/> of this network given the input
+<img class="math" src="_images/math/888f7c323ac0341871e867220ae2d76467d74d6e.png" alt="x"/> by drawing a different weight sample for every sample in the
+input batch.</p>
+<p>This is achieved by using the local reparametrization trick.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>(</strong><strong>...</strong><strong>)</strong> – See docstring of method
+<code class="xref py py-meth docutils literal notranslate"><span class="pre">mnets.mlp.MLP.forward()</span></code>. We
+provide some more specific information below.</p></li>
+<li><p><strong>mean</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.10)"><em>list</em></a>) – The set of mean parameters. The shapes of the tensors
+are expected to follow attribute
+<code class="xref py py-attr docutils literal notranslate"><span class="pre">mnets.mnet_interface.MainNetInterface.param_shapes</span></code>.</p></li>
+<li><p><strong>rho</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.10)"><em>list</em></a>) – The set of <img class="math" src="_images/math/27dc86f9f1b1c3435b2403a869b5870c582facea.png" alt="\rho"/> parameters. The shapes of the
+tensors are expected to follow attribute
+<code class="xref py py-attr docutils literal notranslate"><span class="pre">mnets.mnet_interface.MainNetInterface.param_shapes</span></code>.</p></li>
+<li><p><strong>logvar_enc</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.10)"><em>bool</em></a>) – See docstring of function
+<a class="reference internal" href="probabilistic.html#probabilistic.prob_utils.decode_and_sample_diag_gauss" title="probabilistic.prob_utils.decode_and_sample_diag_gauss"><code class="xref py py-func docutils literal notranslate"><span class="pre">probabilistic.prob_utils.decode_and_sample_diag_gauss()</span></code></a>.</p></li>
+<li><p><strong>mean_only</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.10)"><em>bool</em></a>) – If <code class="docutils literal notranslate"><span class="pre">True</span></code>, the hidden activation will simply
+be set to <img class="math" src="_images/math/34d137cf01c787ecda732761c3f95b0f65a6c3e9.png" alt="\gamma"/>.</p></li>
+<li><p><strong>sample</strong> (<em>optional</em>) – If a specific weight sample is provided, the
+local raparametrization trick will be disabled and the super
+class <code class="docutils literal notranslate"><span class="pre">forward</span></code> method will be called where the sample is
+passed as argument <code class="docutils literal notranslate"><span class="pre">weights</span></code>.</p></li>
+<li><p><strong>rand_state</strong> (<a class="reference external" href="https://pytorch.org/docs/master/generated/torch.Generator.html#torch.Generator" title="(in PyTorch v1.12)"><em>torch.Generator</em></a><em>, </em><em>optional</em>) – This generator would be used
+to realize the reparametrization trick (i.e., the activation
+sampling), if specified. This way, the behavior of the forward
+pass is easily reproducible.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The output of the network.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">regression_uncertainty_mm</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents of this repository:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="gaussian_likelihoods.html">Gaussian Likelihoods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="norm_flow.html">Normalizing Flows</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Networks</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#module-networks.gauss_mlp">API</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="probabilistic.html">Probabilistic</a></li>
+<li class="toctree-l1"><a class="reference internal" href="datasets.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="utils.html">Utilities</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="norm_flow.html" title="previous chapter">Normalizing Flows</a></li>
+      <li>Next: <a href="probabilistic.html" title="next chapter">Probabilistic</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2021, Maria R. Cervera, Rafael Daetwyler, Hamza Keurti, Francesco dAngelo, Christian Henning.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/networks.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

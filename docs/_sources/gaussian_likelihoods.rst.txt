@@ -1,0 +1,29 @@
+.. _gaussian-likelihoods-reference-label:
+
+Regression experiments with Gaussian Likelihoods
+************************************************
+
+.. contents::
+
+This module contains all relevant functions to run experiments with Gaussian likelihood models.
+
+General Notes
+=============
+
+.. include:: ../../oodregression/gaussian_likelihoods/README.rst
+    :start-after: content-inclusion-marker-do-not-remove
+
+API
+===
+
+.. automodule:: gaussian_likelihoods.train
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+.. automodule:: gaussian_likelihoods.train_utils
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+

@@ -1,0 +1,343 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>normalizing_flows.train_utils &#8212; regression_uncertainty_mm 0.1 documentation</title>
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for normalizing_flows.train_utils</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># Copyright 2020 Rafael Daetwyler</span>
+<span class="c1">#</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#    http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+<span class="c1">#</span>
+<span class="c1"># @title          :normalizing_flows/train_utils.py</span>
+<span class="c1"># @author         :rd</span>
+<span class="c1"># @contact        :rafael.daetwyler@uzh.ch</span>
+<span class="c1"># @created        :11/24/2020</span>
+<span class="c1"># @version        :1.0</span>
+<span class="c1"># @python_version :3.7.4</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Helper functions for training scripts.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">scipy.stats</span> <span class="k">import</span> <span class="n">shapiro</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+
+<span class="kn">from</span> <span class="nn">data.data_utils</span> <span class="k">import</span> <span class="n">_ONE_D_MISC</span> <span class="k">as</span> <span class="n">_MISC</span>
+
+<span class="kn">from</span> <span class="nn">probabilistic</span> <span class="k">import</span> <span class="n">prob_utils</span> <span class="k">as</span> <span class="n">putils</span>
+
+<div class="viewcode-block" id="compute_nf_loss"><a class="viewcode-back" href="../../norm_flow.html#normalizing_flows.train_utils.compute_nf_loss">[docs]</a><span class="k">def</span> <span class="nf">compute_nf_loss</span><span class="p">(</span><span class="n">flow</span><span class="p">,</span> <span class="n">Y</span><span class="p">,</span> <span class="n">logabsdet</span><span class="p">,</span> <span class="n">reduction</span><span class="o">=</span><span class="s1">&#39;mean&#39;</span><span class="p">):</span>    
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Returns the loss of the normalizing flow.</span>
+
+<span class="sd">    This function deals with a single model, and the sum for the MC estimate is</span>
+<span class="sd">    therefore done outside this function.</span>
+<span class="sd">    </span>
+<span class="sd">    Overall, we want to minimize the expectation over our training samples of</span>
+<span class="sd">    the KL divergence between our groundtruth :math:`p(y \mid x)` and our</span>
+<span class="sd">    predictions :math:`q(y \mid x, w)`, so we want to minimize:</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        \mathbb{E}_{p(x)}[D_{KL}(p(y|x) \parallel q(y|x,w))] &amp;= \</span>
+<span class="sd">            \mathbb{E}_{p(x)}\big[\mathbb{E}_{p(y|x)}[\log \</span>
+<span class="sd">            \frac{p(y|x)}{q(y|x,w)}] \big] \\</span>
+
+<span class="sd">    Dropping the terms that don&#39;t depent on the posterior we obtain that we</span>
+<span class="sd">    want to minimize the negative cross-entropy </span>
+<span class="sd">    :math:`-\mathbb{E}_{p(x, y)}[\log q(y|x,w)] \big]`.</span>
+
+<span class="sd">    In a normalizing flow, we have the following expression for</span>
+<span class="sd">    :math:`q(y|x,w)`:</span>
+
+<span class="sd">    .. math::</span>
+<span class="sd">        </span>
+<span class="sd">        q(y|x,w) = p_u(u) \mid \det \mathcal{J}_{T(x)}(u) \mid ^{-1}</span>
+
+<span class="sd">    Furthermore we have that :math:`y = T_x(u)` so :math:`u = T_x^{-1}(y)`.</span>
+<span class="sd">    Therefore :math:`p_u(u) = p_u(T_x^{-1}(y))`, and be obtain:</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        - \mathbb{E}_{p(x, y)}[\log q(y|x,w)] \big] =</span>
+<span class="sd">            - \mathbb{E}_{p(x, y)}[\log p_u(T_x^{-1}(y)) + \</span>
+<span class="sd">            \log \mid \det \mathcal{J}_{T_x}(T_x^{-1}(y)) \mid ^{-1}]</span>
+
+<span class="sd">    Noticing that</span>
+<span class="sd">    :math:`\mid \det \mathcal{J}_{T_x}(T_x^{-1}(y)) \mid ^{-1} = \mid \det \</span>
+<span class="sd">    \mathcal{J}_{T_x^{-1}}(y) \mid` we obtain the following MC estimate and</span>
+<span class="sd">    loss function:</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        L(y, x) = - \frac{1}{n}\sum_{i=1}^n [ \log p_u(T_{x_i}^{-1}(y_i)) + \</span>
+<span class="sd">            \log \mid \det \mathcal{J}_{T_{x_i}^{-1}}(y_i) \mid ]</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        flow (SimpleFlow): The normalizing flow.</span>
+<span class="sd">        Y: Output tensor consisting of means. Same shape as ``T``.</span>
+<span class="sd">        logabsdet: The log of the absolute of the Jacobian.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        (float): The loss.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">assert</span> <span class="n">Y</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">logabsdet</span><span class="o">.</span><span class="n">shape</span> <span class="ow">or</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">Y</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span> <span class="ow">and</span> <span class="n">Y</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">reduction</span> <span class="o">==</span> <span class="s1">&#39;mean&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="o">-</span> <span class="n">torch</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">flow</span><span class="o">.</span><span class="n">log_p0</span><span class="p">(</span><span class="n">Y</span><span class="p">)</span> <span class="o">+</span> <span class="n">logabsdet</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="o">-</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">flow</span><span class="o">.</span><span class="n">log_p0</span><span class="p">(</span><span class="n">Y</span><span class="p">)</span> <span class="o">+</span> <span class="n">logabsdet</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="normality_test"><a class="viewcode-back" href="../../norm_flow.html#normalizing_flows.train_utils.normality_test">[docs]</a><span class="k">def</span> <span class="nf">normality_test</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">flow</span><span class="p">,</span> <span class="n">hnet</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sample_size</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+                   <span class="n">return_samples</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Performs the Shapiro–Wilk test on the null hypothesis that the likelihood</span>
+<span class="sd">    is normally distributed at a training point.</span>
+
+<span class="sd">    See SciPy</span>
+<span class="sd">    `_documentation &lt;https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.shapiro.html&gt;`_.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        data: Data handler.</span>
+<span class="sd">        flow: Normalizing flow.</span>
+<span class="sd">        hnet: Hypernetwork.</span>
+<span class="sd">        device: CUDA device.</span>
+<span class="sd">        config: The experiment config.</span>
+<span class="sd">        x (optional): A point at which to test the normality of the likelihood.</span>
+<span class="sd">        sample_size: Sample size to use for the normality test.</span>
+<span class="sd">        return_samples: If True, the samples used to compute the p-value are</span>
+<span class="sd">            also returned.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        (float): p-value of the test.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">x</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">input_to_torch_tensor</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">_MISC</span><span class="o">.</span><span class="n">x</span><span class="p">]),</span> <span class="n">device</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">mean_only</span><span class="p">:</span>
+        <span class="n">w_mean</span> <span class="o">=</span> <span class="n">hnet</span><span class="o">.</span><span class="n">weights</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">w_mean</span><span class="p">,</span> <span class="n">w_rho</span> <span class="o">=</span> <span class="n">hnet</span><span class="o">.</span><span class="n">extract_mean_and_rho</span><span class="p">(</span><span class="n">weights</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">mean_only</span> <span class="ow">or</span> <span class="n">sample_size</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">sample_size</span> <span class="o">=</span> <span class="mi">100</span>
+
+    <span class="c1"># Iterate over the number of models.</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">config</span><span class="o">.</span><span class="n">mean_only</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sample_size</span><span class="p">):</span>
+            <span class="n">weights_j</span> <span class="o">=</span> <span class="n">hnet</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mean_only</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                            <span class="n">extracted_mean</span><span class="o">=</span><span class="n">w_mean</span><span class="p">,</span> <span class="n">extracted_rho</span><span class="o">=</span><span class="n">w_rho</span><span class="p">,</span>
+                            <span class="n">ret_format</span><span class="o">=</span><span class="s1">&#39;flattened&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">j</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">weights</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">sample_size</span><span class="p">,</span><span class="n">weights_j</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+            <span class="n">weights</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">weights_j</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">hnet</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">ret_format</span><span class="o">=</span><span class="s1">&#39;flattened&#39;</span><span class="p">)</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">weights</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="n">sample_size</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="n">samples_pu</span> <span class="o">=</span> <span class="n">flow</span><span class="o">.</span><span class="n">sample_p0</span><span class="p">(</span><span class="n">sample_size</span><span class="p">)</span>
+    <span class="n">samples_py</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">flow</span><span class="o">.</span><span class="n">inverse</span><span class="p">(</span><span class="n">samples_pu</span><span class="p">,</span> <span class="n">weights</span><span class="p">)</span>
+
+    <span class="n">samples_py_numpy</span> <span class="o">=</span> <span class="n">samples_py</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+    <span class="n">statistic</span><span class="p">,</span> <span class="n">p_value</span> <span class="o">=</span> <span class="n">shapiro</span><span class="p">(</span><span class="n">samples_py_numpy</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">return_samples</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">p_value</span><span class="p">,</span> <span class="n">samples_py_numpy</span>
+
+    <span class="k">return</span> <span class="n">p_value</span></div>
+
+
+<div class="viewcode-block" id="max_deviation"><a class="viewcode-back" href="../../norm_flow.html#normalizing_flows.train_utils.max_deviation">[docs]</a><span class="k">def</span> <span class="nf">max_deviation</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">flow</span><span class="p">,</span> <span class="n">hnet</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Computes the maximum deviation between forward and inverse passes of a</span>
+<span class="sd">    normalizing flow.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        (....): See docstring of function :func:`normality_test`.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        (float): The maximum deviation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">x_temp</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">x</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">x_tmp</span> <span class="o">=</span> <span class="n">_MISC</span><span class="o">.</span><span class="n">x</span>
+
+    <span class="n">train_data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get_train_outputs</span><span class="p">()[:</span><span class="mi">200</span><span class="p">]</span>
+    <span class="n">train_data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">output_to_torch_tensor</span><span class="p">(</span><span class="n">train_data</span><span class="p">,</span> <span class="n">device</span><span class="p">)</span>
+
+    <span class="n">x</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">input_to_torch_tensor</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">x_tmp</span><span class="p">]),</span> <span class="n">device</span><span class="p">)</span>
+    <span class="n">weights</span> <span class="o">=</span> <span class="n">hnet</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">ret_format</span><span class="o">=</span><span class="s1">&#39;flattened&#39;</span><span class="p">)</span>
+    <span class="n">weights</span> <span class="o">=</span> <span class="n">weights</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">train_data</span><span class="p">),</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">flow</span><span class="o">.</span><span class="n">get_max_deviation</span><span class="p">(</span><span class="n">train_data</span><span class="p">,</span> <span class="n">weights</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="compute_entropy_nf"><a class="viewcode-back" href="../../norm_flow.html#normalizing_flows.train_utils.compute_entropy_nf">[docs]</a><span class="k">def</span> <span class="nf">compute_entropy_nf</span><span class="p">(</span><span class="n">mnet</span><span class="p">,</span> <span class="n">hnet</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">x_torch</span><span class="p">,</span> <span class="n">num_inputs</span><span class="p">,</span>
+                       <span class="n">num_samples</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">num_models</span><span class="o">=</span><span class="mi">100</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Compute the entropy of a posterior predictive distribution based on NFs.</span>
+
+<span class="sd">    For details about the value being compute please refer to</span>
+<span class="sd">    :func:`gaussian_likelihoods.train_utils.compute_entropy_gaussian`.</span>
+<span class="sd">    </span>
+<span class="sd">    Args:</span>
+<span class="sd">        mnet: The main network.</span>
+<span class="sd">        hnet: The hypernetwork.</span>
+<span class="sd">        config: The configuration.</span>
+<span class="sd">        x_torch (torch.Tensor): The inputs.</span>
+<span class="sd">        num_inputs (int): Size of the input range.</span>
+<span class="sd">        num_samples (int): The number of samples to use for each input.</span>
+<span class="sd">        num_models (int): The number of models to sample for Bayesian networks.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        (np.array): The averaged entropy across weight samples for the entire</span>
+<span class="sd">            input range.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Extract Bayesian model parameters.</span>
+    <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">mean_only</span><span class="p">:</span>
+        <span class="n">w_mean</span> <span class="o">=</span> <span class="n">hnet</span><span class="o">.</span><span class="n">weights</span>
+        <span class="n">w_std</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">w_mean</span><span class="p">,</span> <span class="n">w_rho</span> <span class="o">=</span> <span class="n">hnet</span><span class="o">.</span><span class="n">extract_mean_and_rho</span><span class="p">(</span><span class="n">weights</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+
+    <span class="c1">### First, sample y&#39;s from the posterior predictive distribution.</span>
+    <span class="n">weights</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_samples</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">mean_only</span><span class="p">:</span>
+            <span class="n">weights</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">hnet</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">x_torch</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="n">w_mean</span><span class="p">,</span>
+                           <span class="n">ret_format</span><span class="o">=</span><span class="s1">&#39;flattened&#39;</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">weights</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">hnet</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">x_torch</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                           <span class="n">mean_only</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">extracted_mean</span><span class="o">=</span><span class="n">w_mean</span><span class="p">,</span>
+                           <span class="n">extracted_rho</span><span class="o">=</span><span class="n">w_rho</span><span class="p">,</span> <span class="n">ret_format</span><span class="o">=</span><span class="s1">&#39;flattened&#39;</span><span class="p">))</span>
+    <span class="n">weights</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">weights</span><span class="p">)</span>
+    <span class="n">z_sample</span> <span class="o">=</span> <span class="n">mnet</span><span class="o">.</span><span class="n">sample_p0</span><span class="p">(</span><span class="n">num_samples</span> <span class="o">*</span> <span class="n">num_inputs</span><span class="p">)</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+    <span class="n">weights</span> <span class="o">=</span> <span class="n">weights</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">weights</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+    <span class="n">y_samples</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">mnet</span><span class="o">.</span><span class="n">inverse</span><span class="p">(</span><span class="n">z_sample</span><span class="p">,</span> <span class="n">weights</span><span class="p">)</span>
+    <span class="n">y_samples</span> <span class="o">=</span> <span class="n">y_samples</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">num_samples</span><span class="p">,</span> <span class="n">num_inputs</span><span class="p">)</span> <span class="c1"># num_samples,x_range</span>
+
+    <span class="c1">### Second, compute the densities of the above samples.</span>
+    <span class="n">weights</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_models</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">mean_only</span><span class="p">:</span>
+            <span class="n">weights</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">hnet</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">x_torch</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="n">w_mean</span><span class="p">,</span>
+                           <span class="n">ret_format</span><span class="o">=</span><span class="s1">&#39;flattened&#39;</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">weights</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">hnet</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">x_torch</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                                        <span class="n">mean_only</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                        <span class="n">extracted_mean</span><span class="o">=</span><span class="n">w_mean</span><span class="p">,</span>
+                                        <span class="n">extracted_rho</span><span class="o">=</span><span class="n">w_rho</span><span class="p">,</span>
+                                        <span class="n">ret_format</span><span class="o">=</span><span class="s1">&#39;flattened&#39;</span><span class="p">))</span>
+    <span class="n">weights</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">weights</span><span class="p">)</span>
+    <span class="n">weights</span> <span class="o">=</span> <span class="n">weights</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="n">num_samples</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">permute</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="n">weights</span> <span class="o">=</span> <span class="n">weights</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">weights</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+    <span class="c1"># extend y_samples to match shape of weights</span>
+    <span class="n">y_samples</span> <span class="o">=</span> <span class="n">y_samples</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="n">num_models</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">permute</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="n">y_samples</span> <span class="o">=</span> <span class="n">y_samples</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="n">z_val</span><span class="p">,</span> <span class="n">logabsdet</span> <span class="o">=</span> <span class="n">mnet</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">y_samples</span><span class="p">,</span> <span class="n">weights</span><span class="p">)</span>
+    <span class="n">py</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">mnet</span><span class="o">.</span><span class="n">log_p0</span><span class="p">(</span><span class="n">z_val</span><span class="p">)</span> <span class="o">+</span> <span class="n">logabsdet</span><span class="p">)</span>
+    <span class="n">py</span> <span class="o">=</span> <span class="n">py</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">num_inputs</span><span class="p">,</span> <span class="n">num_samples</span><span class="p">,</span> <span class="n">num_models</span><span class="p">)</span>
+    <span class="n">py</span> <span class="o">=</span> <span class="n">py</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span> <span class="c1"># x_range, num_samples, num_models</span>
+    <span class="n">logmean</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">py</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span> <span class="c1"># average across models</span>
+    <span class="n">entropy</span> <span class="o">=</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">logmean</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span> <span class="c1"># average across samples</span>
+
+    <span class="k">return</span> <span class="n">entropy</span></div>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="k">pass</span>
+
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">regression_uncertainty_mm</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents of this repository:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../gaussian_likelihoods.html">Gaussian Likelihoods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../norm_flow.html">Normalizing Flows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../networks.html">Networks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../probabilistic.html">Probabilistic</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../datasets.html">Datasets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../utils.html">Utilities</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2021, Maria R. Cervera, Rafael Daetwyler, Hamza Keurti, Francesco dAngelo, Christian Henning.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

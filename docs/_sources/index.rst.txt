@@ -1,0 +1,28 @@
+.. mm_uncerainty documentation master file, created by
+   sphinx-quickstart on Thu Aug  5 13:10:18 2021.
+   You can adapt this file completely to your liking, but it should at least
+   contain the root `toctree` directive.
+
+Welcome to regression_uncertainty_mm's documentation!
+=========================================
+
+This documentation accompanies the official repo supporting our `workshop paper <https://arxiv.org/abs/2111.11763>`_.
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents of this repository:
+
+   Gaussian Likelihoods <gaussian_likelihoods.rst>
+   Normalizing Flows <norm_flow.rst>
+   Networks <networks.rst>
+   Probabilistic <probabilistic.rst>
+   Datasets <datasets.rst>
+   Utilities <utils.rst>
+
+
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`

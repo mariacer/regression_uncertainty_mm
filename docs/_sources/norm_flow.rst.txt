@@ -1,0 +1,53 @@
+.. _norm_flow-reference-label:
+
+Normalizing Flows
+*****************
+
+.. contents::
+
+This module contains all relevant functions to run experiments with flow-based likelihood models.
+
+General Notes
+=============
+
+.. include:: ../../oodregression/normalizing_flows/README.rst
+    :start-after: content-inclusion-marker-do-not-remove
+
+API
+===
+
+.. automodule:: normalizing_flows.train
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+.. automodule:: normalizing_flows.train_2d
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+.. automodule:: normalizing_flows.train_utils
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+.. automodule:: normalizing_flows.simple_regression.simple_flow
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+.. automodule:: normalizing_flows.simple_regression.layers.splines
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+.. automodule:: normalizing_flows.simple_regression.layers.perceptron
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+.. automodule:: normalizing_flows.simple_regression.bivariate_flow
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
